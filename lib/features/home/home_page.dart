@@ -11,6 +11,7 @@ import '../../core/models/market_model.dart';
 import '../../core/models/crypto_model.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/widgets/blog_post_sheet.dart';
+import '../../core/utils/formatters.dart';
 import 'widgets/index_card.dart';
 
 // Inline providers for calendar (reuse from finance page logic)
@@ -182,7 +183,7 @@ class _StockTile extends StatelessWidget {
             Text(stock.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${stock.price.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            Text(fmtStockPrice(stock.price), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const SizedBox(height: 2),
             _ChangeBadge(value: stock.changePct, color: color),
           ]),
@@ -199,11 +200,7 @@ class _CryptoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final up = coin.priceChangePercentage24h >= 0;
     final color = up ? AppColors.emerald : AppColors.red;
-    String fmtPrice(double p) {
-      if (p >= 1000) return p.toStringAsFixed(0);
-      if (p >= 1)    return p.toStringAsFixed(2);
-      return p.toStringAsFixed(6);
-    }
+    String fmtPrice(double p) => fmtCryptoPrice(p).replaceFirst('\$', '');
     return InkWell(
       onTap: () => context.push('/crypto/${coin.id}'),
       child: Padding(
@@ -590,7 +587,7 @@ class _HeatmapCard extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(stock.symbol, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-            Text('\$${stock.price.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: AppColors.textSecond)),
+            Text(fmtStockPrice(stock.price), style: const TextStyle(fontSize: 11, color: AppColors.textSecond)),
           ])),
           _ChangeBadge(value: stock.changePct, color: color),
         ]),
@@ -671,7 +668,7 @@ class _RankRow extends StatelessWidget {
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(value(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: tab == 2 ? AppColors.textPrimary : color)),
             if (tab == 2 || tab == 3)
-              Text('\$${stock.price.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              Text(fmtStockPrice(stock.price), style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
           ]),
         ]),
       ),
@@ -802,11 +799,7 @@ class _CryptoPreviewRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final up    = coin.priceChangePercentage24h >= 0;
     final color = up ? AppColors.emerald : AppColors.red;
-    String fmtPrice(double p) {
-      if (p >= 1000) return p.toStringAsFixed(0);
-      if (p >= 1)    return p.toStringAsFixed(2);
-      return p.toStringAsFixed(6);
-    }
+    String fmtPrice(double p) => fmtCryptoPrice(p).replaceFirst('\$', '');
     return InkWell(
       onTap: () => context.push('/crypto/${coin.id}'),
       child: Padding(
