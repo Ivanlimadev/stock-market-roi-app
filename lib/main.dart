@@ -7,9 +7,18 @@ import 'core/router/app_router.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  const supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://ogbramvzqmbkizspeccg.supabase.co',
+  );
+  const supabaseKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'sb_publishable_O9J-hDKHWgUQfOIFxaN1wA_eRbimHqy',
+  );
+
   await Supabase.initialize(
-    url:     const String.fromEnvironment('SUPABASE_URL'),
-    publishableKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
+    url:            supabaseUrl,
+    publishableKey: supabaseKey,
   );
 
   runApp(const ProviderScope(child: App()));
