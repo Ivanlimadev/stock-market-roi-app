@@ -25,6 +25,8 @@ class StockQuote {
   final double price;
   final double changePct;
   final double? marketCap;
+  final double? volume;
+  final double? dividendYield;
   final String? sector;
 
   const StockQuote({
@@ -33,16 +35,20 @@ class StockQuote {
     required this.price,
     required this.changePct,
     this.marketCap,
+    this.volume,
+    this.dividendYield,
     this.sector,
   });
 
   factory StockQuote.fromJson(Map<String, dynamic> j) => StockQuote(
-    symbol:    j['symbol'] as String,
-    name:      j['name'] as String,
-    price:     (j['price'] as num).toDouble(),
-    changePct: (j['changePct'] as num).toDouble(),
-    marketCap: j['marketCap'] != null ? (j['marketCap'] as num).toDouble() : null,
-    sector:    j['sector'] as String?,
+    symbol:        j['symbol'] as String,
+    name:          j['name'] as String,
+    price:         (j['price'] as num).toDouble(),
+    changePct:     (j['changePct'] as num).toDouble(),
+    marketCap:     (j['marketCap'] as num?)?.toDouble(),
+    volume:        (j['volume'] as num?)?.toDouble(),
+    dividendYield: (j['dividendYield'] as num?)?.toDouble(),
+    sector:        j['sector'] as String?,
   );
 }
 
