@@ -8,6 +8,7 @@ import '../../core/providers/blog_provider.dart';
 import '../../core/models/stock_detail_model.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/widgets/blog_post_sheet.dart';
+import '../../core/utils/formatters.dart';
 
 class StockDetailPage extends ConsumerWidget {
   final String symbol;
@@ -129,7 +130,7 @@ class _Body extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('\$${stock.currentPrice.toStringAsFixed(2)}',
+              Text(fmtStockPrice(stock.currentPrice),
                 style: const TextStyle(fontSize: 36,
                   fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
               const SizedBox(width: 10),
@@ -152,7 +153,7 @@ class _Body extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
           child: Text(
-            '${up ? '+' : ''}\$${stock.change.abs().toStringAsFixed(2)} today',
+            '${up ? '+' : ''}${fmtStockPrice(stock.change.abs())} today',
             style: TextStyle(fontSize: 13, color: color)),
         ),
 
@@ -257,13 +258,7 @@ class _KeyStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String fmtBig(double? v) {
-      if (v == null || v == 0) return '—';
-      if (v >= 1e12) return '\$${(v / 1e12).toStringAsFixed(2)}T';
-      if (v >= 1e9)  return '\$${(v / 1e9).toStringAsFixed(2)}B';
-      if (v >= 1e6)  return '\$${(v / 1e6).toStringAsFixed(2)}M';
-      return '\$${v.toStringAsFixed(0)}';
-    }
+    String fmtBig(double? v) => fmtBigUsd(v);
     String fmtVol(double? v) {
       if (v == null || v == 0) return '—';
       if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)}M';
@@ -289,7 +284,7 @@ class _KeyStats extends StatelessWidget {
     }
 
     final rows = <(String, String)>[
-      ('Previous Close', '\$${stock.prevClose.toStringAsFixed(2)}'),
+      ('Previous Close', fmtStockPrice(stock.prevClose)),
       if (info.pe != null && info.pe! > 0)    ('P/E Ratio', fmtN(info.pe)),
       if (info.forwardPE != null && info.forwardPE! > 0) ('Forward P/E', fmtN(info.forwardPE)),
       if (info.eps != null)                   ('EPS', '\$${fmtN(info.eps)}'),

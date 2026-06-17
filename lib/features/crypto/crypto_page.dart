@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/crypto_provider.dart';
 import '../../core/models/crypto_model.dart';
+import '../../core/utils/formatters.dart';
 
 class CryptoPage extends ConsumerStatefulWidget {
   const CryptoPage({super.key});
@@ -150,17 +151,8 @@ class _GlobalStats extends ConsumerWidget {
     );
   }
 
-  String _fmtBig(double v) {
-    if (v >= 1e12) return '\$${(v / 1e12).toStringAsFixed(2)}T';
-    if (v >= 1e9)  return '\$${(v / 1e9).toStringAsFixed(1)}B';
-    if (v >= 1e6)  return '\$${(v / 1e6).toStringAsFixed(0)}M';
-    return '\$$v';
-  }
-
-  String _fmtCount(int v) {
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
-    return '$v';
-  }
+  String _fmtBig(double v) => fmtBigUsd(v);
+  String _fmtCount(int v) => fmtCount(v);
 }
 
 class _StatCard extends StatelessWidget {
@@ -968,9 +960,5 @@ class _ErrorBox extends StatelessWidget {
   );
 }
 
-String _fmtPrice(double price) {
-  if (price >= 1000) return price.toStringAsFixed(0);
-  if (price >= 1)    return price.toStringAsFixed(2);
-  if (price >= 0.01) return price.toStringAsFixed(4);
-  return price.toStringAsFixed(6);
-}
+// Uses fmtCryptoPrice from formatters.dart — keeps $ prefix stripped for inline use
+String _fmtPrice(double price) => fmtCryptoPrice(price).replaceFirst('\$', '');

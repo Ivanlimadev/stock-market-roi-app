@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/widgets/blog_post_sheet.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/blog_post_model.dart';
+import '../../core/utils/formatters.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ final cryptoDetailProvider = FutureProvider.autoDispose
   final data = CryptoDetail.fromJson(res.data as Map<String, dynamic>);
 
   // Schedule next refresh; cancel on dispose
-  final timer = Timer(const Duration(seconds: 30), () => ref.invalidateSelf());
+  final timer = Timer(const Duration(seconds: 15), () => ref.invalidateSelf());
   ref.onDispose(timer.cancel);
 
   return data;
@@ -856,27 +857,12 @@ class _CoinFallback extends StatelessWidget {
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-String _fmtPrice(double price) {
-  if (price >= 10000) return price.toStringAsFixed(0);
-  if (price >= 1)     return price.toStringAsFixed(2);
-  if (price >= 0.01)  return price.toStringAsFixed(4);
-  return price.toStringAsFixed(8);
-}
+// Strips leading $ since callers prepend it where needed
+String _fmtPrice(double price) => fmtCryptoPrice(price).replaceFirst('\$', '');
 
-String _fmtBig(double? v) {
-  if (v == null || v == 0) return '—';
-  if (v >= 1e12) return '\$${(v / 1e12).toStringAsFixed(2)}T';
-  if (v >= 1e9)  return '\$${(v / 1e9).toStringAsFixed(2)}B';
-  if (v >= 1e6)  return '\$${(v / 1e6).toStringAsFixed(2)}M';
-  return '\$${v.toStringAsFixed(0)}';
-}
+String _fmtBig(double? v) => fmtBigUsd(v);
 
-String _fmtSupply(double v) {
-  if (v >= 1e9)  return '${(v / 1e9).toStringAsFixed(2)}B';
-  if (v >= 1e6)  return '${(v / 1e6).toStringAsFixed(2)}M';
-  if (v >= 1e3)  return '${(v / 1e3).toStringAsFixed(1)}K';
-  return v.toStringAsFixed(0);
-}
+String _fmtSupply(double v) => fmtSupply(v);
 
 String _fmtDate(String iso) {
   try {
