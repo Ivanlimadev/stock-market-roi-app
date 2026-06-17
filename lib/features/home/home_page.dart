@@ -4,19 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/market_provider.dart';
-import '../../core/providers/news_provider.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/providers/crypto_provider.dart';
+import '../../core/providers/blog_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/models/crypto_model.dart';
-import '../../core/models/news_model.dart';
-import '../../core/widgets/blog_post_sheet.dart';
 import '../../core/models/blog_post_model.dart';
+import '../../core/widgets/blog_post_sheet.dart';
 import 'widgets/index_card.dart';
-import 'widgets/news_card.dart';
-
-// ignore: unused_import
-import '../../core/providers/blog_provider.dart';
 
 // Inline providers for calendar (reuse from finance page logic)
 import '../../core/api/api_client.dart';
@@ -97,9 +92,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               icon: const Icon(Icons.refresh_rounded),
               onPressed: () {
                 ref.invalidate(marketOverviewProvider);
-                ref.invalidate(marketNewsProvider);
                 ref.invalidate(screenerProvider);
                 ref.invalidate(cryptoMarketsProvider);
+                ref.invalidate(blogPostsProvider);
                 ref.invalidate(_calEarningsProvider);
                 ref.invalidate(_calDividendsProvider);
               },
@@ -262,7 +257,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
     final earningsAsync = ref.watch(_calEarningsProvider);
     final dividendsAsync = ref.watch(_calDividendsProvider);
     final cryptoAsync  = ref.watch(cryptoMarketsProvider);
-    final newsAsync    = ref.watch(marketNewsProvider);
+    final blogAsync    = ref.watch(blogPostsProvider);
 
     AsyncValue<List<StockQuote>> rankData() {
       return switch (_rankTab) {
@@ -281,7 +276,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
         ref.invalidate(screenerProvider);
         ref.invalidate(trendingProvider);
         ref.invalidate(cryptoMarketsProvider);
-        ref.invalidate(marketNewsProvider);
+        ref.invalidate(blogPostsProvider);
         ref.invalidate(_calEarningsProvider);
         ref.invalidate(_calDividendsProvider);
         await Future.wait([
@@ -403,21 +398,25 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
             ),
           ),
 
-          // ── 6. Market News ─────────────────────────────────────────────
-          _SectionHeader(title: 'Market News', subtitle: 'Top stories today'),
-          newsAsync.when(
-            loading: () => _newsSkeleton(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (news) => SizedBox(
-              height: 240,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemCount: news.length,
-                itemBuilder: (_, i) => NewsCard(news: news[i]),
-              ),
+          // ── 6. Artigos Cripto ──────────────────────────────────────────
+          _SectionHeader(
+            title: 'Crypto Articles',
+            subtitle: 'From our blog',
+            trailing: TextButton(
+              onPressed: () => context.go('/news'),
+              child: const Text('Ver todos', style: TextStyle(color: AppColors.emerald, fontSize: 12)),
             ),
+          ),
+          blogAsync.when(
+            loading: () => _blogSkeleton(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (posts) {
+              final crypto = posts.where((p) => p.category == 'Crypto').take(4).toList();
+              if (crypto.isEmpty) return const SizedBox.shrink();
+              return Column(
+                children: crypto.map((post) => _HomeBlogTile(post: post)).toList(),
+              );
+            },
           ),
 
           const SizedBox(height: 32),
@@ -468,17 +467,22 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
     )),
   );
 
-  Widget _newsSkeleton() => SizedBox(
-    height: 240,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      separatorBuilder: (_, __) => const SizedBox(width: 12),
-      itemCount: 3,
-      itemBuilder: (_, __) => Container(
-        width: 260, height: 236,
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12))),
-    ),
+  Widget _blogSkeleton() => Column(
+    children: List.generate(3, (_) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(children: [
+        Container(width: 72, height: 72, decoration: BoxDecoration(
+          color: AppColors.surface, borderRadius: BorderRadius.circular(10))),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(height: 12, width: 60, color: AppColors.surface),
+          const SizedBox(height: 8),
+          Container(height: 14, color: AppColors.surface),
+          const SizedBox(height: 6),
+          Container(height: 14, width: double.infinity * 0.7, color: AppColors.surface),
+        ])),
+      ]),
+    )),
   );
 }
 
@@ -836,5 +840,104 @@ class _CryptoPreviewRow extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+// ── Home Blog Tile ────────────────────────────────────────────────────────────
+
+const _homeCatColors = {
+  'Markets':    Color(0xFF6366F1),
+  'Stocks':     Color(0xFF10B981),
+  'Investing':  Color(0xFFF59E0B),
+  'Economics':  Color(0xFFEF4444),
+  'Crypto':     Color(0xFFF97316),
+  'Technology': Color(0xFF3B82F6),
+};
+
+class _HomeBlogTile extends StatelessWidget {
+  final BlogPost post;
+  const _HomeBlogTile({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final catColor = _homeCatColors[post.category] ?? AppColors.emerald;
+    final ago      = _blogTimeAgo(post.publishedAt);
+
+    return InkWell(
+      onTap: () => showBlogPostSheet(context, post),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cover image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: post.imageUrl != null
+                  ? Image.network(
+                      post.imageUrl!,
+                      width: 72, height: 72,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _blogPlaceholder(catColor),
+                    )
+                  : _blogPlaceholder(catColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: catColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(post.category,
+                        style: TextStyle(fontSize: 10, color: catColor, fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(ago, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                  ]),
+                  const SizedBox(height: 5),
+                  Text(
+                    post.title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _blogPlaceholder(Color color) => Container(
+    width: 72, height: 72,
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Icon(Icons.article_rounded, color: color.withValues(alpha: 0.4), size: 28),
+  );
+
+  String _blogTimeAgo(String iso) {
+    try {
+      final diff = DateTime.now().difference(DateTime.parse(iso).toLocal());
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24)   return '${diff.inHours}h ago';
+      if (diff.inDays < 7)     return '${diff.inDays}d ago';
+      if (diff.inDays < 30)    return '${(diff.inDays / 7).floor()}w ago';
+      return '${(diff.inDays / 30).floor()}mo ago';
+    } catch (_) { return ''; }
   }
 }
