@@ -12,7 +12,7 @@ class IndexCard extends StatelessWidget {
     final color = up ? AppColors.emerald : AppColors.red;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),

@@ -5,7 +5,9 @@ import '../../core/theme/app_theme.dart';
 import '../../core/providers/market_provider.dart';
 import '../../core/providers/news_provider.dart';
 import '../../core/providers/screener_provider.dart';
+import '../../core/providers/crypto_provider.dart';
 import '../../core/models/market_model.dart';
+import '../../core/models/crypto_model.dart';
 import 'widgets/index_card.dart';
 import 'widgets/stock_row.dart';
 import 'widgets/news_card.dart';
@@ -42,6 +44,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final query        = ref.watch(_stockQueryProvider);
     final screenerData = ref.watch(screenerProvider);
+    final cryptoData   = ref.watch(cryptoMarketsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -92,7 +95,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ],
       ),
       body: _searching
-          ? _StockSearchResults(query: query, screener: screenerData)
+          ? _StockSearchResults(query: query, screener: screenerData, crypto: cryptoData)
           : _MarketsBody(ref: ref),
     );
   }
@@ -103,49 +106,66 @@ class _HomePageState extends ConsumerState<HomePage> {
 class _StockSearchResults extends StatelessWidget {
   final String query;
   final AsyncValue<List<StockQuote>> screener;
-  const _StockSearchResults({required this.query, required this.screener});
+  final AsyncValue<List<CryptoMarket>> crypto;
+  const _StockSearchResults({
+    required this.query,
+    required this.screener,
+    required this.crypto,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return screener.when(
-      loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.emerald)),
-      error: (e, _) => const Center(
-          child: Text('Failed to load stocks',
-              style: TextStyle(color: AppColors.textMuted))),
-      data: (all) {
-        final results = query.isEmpty
-            ? all
-            : all.where((s) =>
-                s.symbol.toUpperCase().contains(query.toUpperCase()) ||
-                s.name.toLowerCase().contains(query.toLowerCase())).toList();
+    if (query.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_rounded, size: 48, color: AppColors.surfaceAlt),
+            SizedBox(height: 12),
+            Text('Search stocks and crypto',
+                style: TextStyle(color: AppColors.textMuted)),
+          ],
+        ),
+      );
+    }
 
-        if (query.isNotEmpty && results.isEmpty) {
-          return Center(
-            child: Text('No results for "$query"',
-                style: const TextStyle(color: AppColors.textMuted)));
-        }
+    final q = query.toLowerCase();
 
-        if (query.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.search_rounded, size: 48, color: AppColors.surfaceAlt),
-                SizedBox(height: 12),
-                Text('Type to search stocks',
-                    style: TextStyle(color: AppColors.textMuted)),
-              ],
-            ),
-          );
-        }
+    // Score: 4=exact symbol, 3=symbol starts with, 2=name starts with, 1=contains
+    int score(String symbol, String name) {
+      final sym = symbol.toLowerCase();
+      final nm  = name.toLowerCase();
+      if (sym == q)           return 4;
+      if (sym.startsWith(q))  return 3;
+      if (nm.startsWith(q))   return 2;
+      if (sym.contains(q) || nm.contains(q)) return 1;
+      return 0;
+    }
 
-        return ListView.builder(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          itemCount: results.length,
-          itemBuilder: (_, i) => _SearchTile(stock: results[i]),
-        );
-      },
+    // Build a unified list: (widget-builder, score)
+    final items = <({Widget Function(BuildContext) build, int score})>[];
+
+    for (final s in (screener.valueOrNull ?? [])) {
+      final sc = score(s.symbol, s.name);
+      if (sc > 0) items.add((build: (_) => _SearchTile(stock: s), score: sc));
+    }
+    for (final c in (crypto.valueOrNull ?? [])) {
+      final sc = score(c.symbol, c.name);
+      if (sc > 0) items.add((build: (_) => _CryptoSearchTile(coin: c), score: sc));
+    }
+
+    if (items.isEmpty) {
+      return Center(
+        child: Text('No results for "$query"',
+            style: const TextStyle(color: AppColors.textMuted)));
+    }
+
+    items.sort((a, b) => b.score.compareTo(a.score));
+
+    return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      itemCount: items.length,
+      itemBuilder: (ctx, i) => items[i].build(ctx),
     );
   }
 }
@@ -236,6 +256,84 @@ class _SearchTile extends StatelessWidget {
   }
 }
 
+class _CryptoSearchTile extends StatelessWidget {
+  final CryptoMarket coin;
+  const _CryptoSearchTile({required this.coin});
+
+  @override
+  Widget build(BuildContext context) {
+    final up    = coin.priceChangePercentage24h >= 0;
+    final color = up ? AppColors.emerald : AppColors.red;
+
+    String fmtPrice(double p) {
+      if (p >= 1000) return p.toStringAsFixed(0);
+      if (p >= 1)    return p.toStringAsFixed(2);
+      return p.toStringAsFixed(6);
+    }
+
+    return InkWell(
+      onTap: () => context.push('/crypto/${coin.id}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.network(
+                coin.image,
+                width: 40, height: 40,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 40, height: 40,
+                  color: AppColors.surfaceAlt,
+                  child: Center(
+                    child: Text(coin.symbol.toUpperCase().substring(0, 1),
+                      style: const TextStyle(fontWeight: FontWeight.bold,
+                        fontSize: 14, color: AppColors.textMuted)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(coin.symbol.toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  Text(coin.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('\$${fmtPrice(coin.currentPrice)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${up ? '+' : ''}${coin.priceChangePercentage24h.toStringAsFixed(2)}%',
+                    style: TextStyle(
+                      fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Markets body (normal state) ───────────────────────────────────────────────
 
 class _MarketsBody extends ConsumerWidget {
@@ -269,10 +367,10 @@ class _MarketsBody extends ConsumerWidget {
             data: (data) {
               if (data.indices.isEmpty) return const SizedBox.shrink();
               return SizedBox(
-                height: 104,
+                height: 112,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   separatorBuilder: (_ , $) => const SizedBox(width: 10),
                   itemCount: data.indices.length,
                   itemBuilder: (_, i) => IndexCard(index: data.indices[i]),
@@ -395,14 +493,14 @@ class _IndicesSkeletons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 104,
+      height: 112,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         separatorBuilder: (_ , $) => const SizedBox(width: 10),
         itemCount: 4,
         itemBuilder: (_ , $) => Container(
-          width: 110, height: 80,
+          width: 110, height: 92,
           decoration: BoxDecoration(
               color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
         ),
