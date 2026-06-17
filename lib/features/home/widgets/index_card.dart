@@ -21,11 +21,11 @@ class IndexCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(index.displayName,
+          Text(index.name,
             style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
           Text(
-            index.close.toStringAsFixed(index.close >= 1000 ? 0 : 2),
+            index.price.toStringAsFixed(index.price >= 1000 ? 0 : 2),
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 2),
