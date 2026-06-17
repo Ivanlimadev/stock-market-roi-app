@@ -17,6 +17,7 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
     with SingleTickerProviderStateMixin {
   int _heatmapTab = 1; // 0=1h 1=24h 2=7d 3=30d 4=1y
   int _rankingTab = 0; // 0=Trending 1=Gainers 2=Losers
+  bool _showAllCoins = false;
 
   void _refresh() {
     ref.invalidate(cryptoMarketsProvider);
@@ -68,7 +69,10 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
 
             // ── Top 100 list ─────────────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionHeader('Top Cryptocurrencies')),
-            _CryptoList(),
+            _CryptoList(
+              showAll: _showAllCoins,
+              onShowMore: () => setState(() => _showAllCoins = true),
+            ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
@@ -700,6 +704,10 @@ class _HeatTile extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _CryptoList extends ConsumerWidget {
+  final bool showAll;
+  final VoidCallback onShowMore;
+  const _CryptoList({required this.showAll, required this.onShowMore});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(cryptoMarketsProvider);
@@ -720,16 +728,65 @@ class _CryptoList extends ConsumerWidget {
           ),
         ),
       ),
-      data: (coins) => SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, i) {
-            if (i == 0) return _CoinTableHeader();
-            final coin = coins[i - 1];
-            return _CoinTableRow(coin: coin, rank: i);
-          },
-          childCount: coins.length + 1,
-        ),
-      ),
+      data: (coins) {
+        if (!showAll) {
+          // Show top 5 + "Ver mais" button
+          final top5 = coins.take(5).toList();
+          return SliverToBoxAdapter(
+            child: Column(
+              children: [
+                _CoinTableHeader(),
+                ...top5.asMap().entries.map(
+                  (e) => _CoinTableRow(coin: e.value, rank: e.key + 1),
+                ),
+                // Ver mais button
+                InkWell(
+                  onTap: onShowMore,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.surfaceAlt),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Ver mais  ${coins.length - 5} criptos',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.emerald,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 18, color: AppColors.emerald),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Show all
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              if (i == 0) return _CoinTableHeader();
+              final coin = coins[i - 1];
+              return _CoinTableRow(coin: coin, rank: i);
+            },
+            childCount: coins.length + 1,
+          ),
+        );
+      },
     );
   }
 }
