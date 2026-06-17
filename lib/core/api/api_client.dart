@@ -11,6 +11,9 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        // Bypass iOS URLSession cache so prices always fetch fresh
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache',
       },
     ),
   )..interceptors.add(
