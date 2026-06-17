@@ -11,6 +11,7 @@ import '../../features/portfolio/portfolio_page.dart';
 import '../../features/news/news_page.dart';
 import '../../features/crypto/crypto_page.dart';
 import '../../features/crypto/crypto_detail_page.dart';
+import '../../features/perfil/perfil_page.dart';
 import '../shell/main_shell.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -26,10 +27,7 @@ final appRouter = GoRouter(
         state.matchedLocation.startsWith('/register') ||
         state.matchedLocation.startsWith('/forgot-password');
 
-    final isProtected = state.matchedLocation.startsWith('/portfolio');
-
-    if (isProtected && !isAuth) return '/login';
-    if (isAuth && isOnAuth)     return '/home';
+    if (isAuth && isOnAuth) return '/home';
     return null;
   },
   routes: [
@@ -60,6 +58,7 @@ final appRouter = GoRouter(
         GoRoute(path: '/portfolio', builder: (_, $) => const PortfolioPage()),
         GoRoute(path: '/news',      builder: (_, $) => const NewsPage()),
         GoRoute(path: '/crypto',    builder: (_, $) => const CryptoPage()),
+        GoRoute(path: '/perfil',    builder: (_, $) => const PerfilPage()),
       ],
     ),
   ],

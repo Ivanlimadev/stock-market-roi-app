@@ -9,9 +9,10 @@ class MainShell extends StatelessWidget {
   static const _tabs = [
     _Tab(icon: Icons.bar_chart_rounded,               label: 'Markets',  path: '/home'),
     _Tab(icon: Icons.account_balance_outlined,        label: 'Finance',  path: '/finance'),
-    _Tab(icon: Icons.account_balance_wallet_rounded,  label: 'Portfolio',path: '/portfolio'),
+    _Tab(icon: Icons.account_balance_wallet_rounded,  label: 'Carteira', path: '/portfolio'),
     _Tab(icon: Icons.newspaper_rounded,               label: 'News',     path: '/news'),
     _Tab(icon: Icons.currency_bitcoin,                label: 'Crypto',   path: '/crypto'),
+    _Tab(icon: Icons.person_rounded,                  label: 'Perfil',   path: '/perfil'),
   ];
 
   int _currentIndex(BuildContext context) {
