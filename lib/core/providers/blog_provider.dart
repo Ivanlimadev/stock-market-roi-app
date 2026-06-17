@@ -6,3 +6,11 @@ final blogPostsProvider = FutureProvider.autoDispose<List<BlogPost>>((ref) async
   final data = await ApiClient.get<List<dynamic>>('/blog/latest?limit=60');
   return data.map((e) => BlogPost.fromJson(e as Map<String, dynamic>)).toList();
 });
+
+final relatedPostsProvider =
+    FutureProvider.autoDispose.family<List<BlogPost>, String>((ref, ticker) async {
+  final data = await ApiClient.get<List<dynamic>>(
+    '/blog/by-ticker?ticker=${ticker.toUpperCase()}&limit=3',
+  );
+  return data.map((e) => BlogPost.fromJson(e as Map<String, dynamic>)).toList();
+});

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/blog_post_model.dart';
+import '../../core/widgets/blog_post_sheet.dart';
 
 const _categories = [
   'All',
@@ -154,10 +154,7 @@ class _PostTile extends StatelessWidget {
     final ago      = _timeAgo(post.publishedAt);
 
     return InkWell(
-      onTap: () => launchUrl(
-        Uri.parse('https://stockmarketroi.com/blog/${post.slug}'),
-        mode: LaunchMode.inAppBrowserView,
-      ),
+      onTap: () => showBlogPostSheet(context, post),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(

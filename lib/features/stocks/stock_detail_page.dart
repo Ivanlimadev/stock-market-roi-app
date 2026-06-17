@@ -4,7 +4,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/stock_detail_provider.dart';
+import '../../core/providers/blog_provider.dart';
 import '../../core/models/stock_detail_model.dart';
+import '../../core/models/blog_post_model.dart';
+import '../../core/widgets/blog_post_sheet.dart';
 
 class StockDetailPage extends ConsumerWidget {
   final String symbol;
@@ -177,6 +180,9 @@ class _Body extends ConsumerWidget {
         // ── About ─────────────────────────────────────────────────────────
         if (stock.info?.description != null && stock.info!.description!.isNotEmpty)
           _About(text: stock.info!.description!),
+
+        // ── Related Articles ──────────────────────────────────────────────
+        _RelatedArticles(sym: sym),
 
         const SizedBox(height: 32),
       ],
@@ -408,4 +414,130 @@ class _AboutState extends State<_About> {
       ),
     );
   }
+}
+
+// ── Related Articles ──────────────────────────────────────────────────────────
+
+class _RelatedArticles extends ConsumerWidget {
+  final String sym;
+  const _RelatedArticles({required this.sym});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(relatedPostsProvider(sym));
+
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (posts) {
+        if (posts.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+              child: Text(
+                'Related Articles',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            ...posts.map((post) => _RelatedPostTile(post: post)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+const _categoryColors = {
+  'Markets':    Color(0xFF6366F1),
+  'Stocks':     Color(0xFF10B981),
+  'Investing':  Color(0xFFF59E0B),
+  'Economics':  Color(0xFFEF4444),
+  'Crypto':     Color(0xFFF97316),
+  'Technology': Color(0xFF3B82F6),
+};
+
+class _RelatedPostTile extends StatelessWidget {
+  final BlogPost post;
+  const _RelatedPostTile({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final catColor = _categoryColors[post.category] ?? AppColors.emerald;
+
+    return InkWell(
+      onTap: () => showBlogPostSheet(context, post),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (post.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  post.imageUrl!,
+                  width: 72, height: 72,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _placeholder(catColor),
+                ),
+              )
+            else
+              _placeholder(catColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: catColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      post.category,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: catColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    post.title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder(Color color) => Container(
+    width: 72, height: 72,
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Icon(Icons.article_rounded,
+        color: color.withValues(alpha: 0.4), size: 28),
+  );
 }
