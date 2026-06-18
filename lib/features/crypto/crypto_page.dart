@@ -6,6 +6,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/providers/crypto_provider.dart';
 import '../../core/models/crypto_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/providers/realtime_price_provider.dart';
+import '../../core/shell/main_shell.dart';
 
 class CryptoPage extends ConsumerStatefulWidget {
   const CryptoPage({super.key});
@@ -37,12 +39,14 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
           slivers: [
             SliverAppBar(
               pinned: true,
-              title: const Text('Crypto Market'),
+              title: Text('Crypto Market'),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: Icon(Icons.refresh_rounded),
                   onPressed: _refresh,
                 ),
+                MainShellMenu.themeButton(),
+                MainShellMenu.button(),
               ],
             ),
 
@@ -90,9 +94,12 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
 class _GlobalStats extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(cryptoGlobalProvider);
+    final async      = ref.watch(cryptoGlobalProvider);
+    final liveCount  = ref.watch(realtimePriceProvider).length;
+    final isLive     = liveCount > 0;
+
     return async.when(
-      loading: () => const SizedBox(
+      loading: () => SizedBox(
         height: 130,
         child: Center(child: CircularProgressIndicator(color: AppColors.emerald, strokeWidth: 2)),
       ),
@@ -104,13 +111,32 @@ class _GlobalStats extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Cryptocurrency Market',
+              Text('Cryptocurrency Market',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary)),
-              const SizedBox(height: 4),
-              const Text('Live prices via CoinGecko',
-                  style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-              const SizedBox(height: 14),
+                      color: context.colors.textPrimary)),
+              SizedBox(height: 4),
+              Row(
+                children: [
+                  if (isLive) ...[
+                    Container(
+                      width: 7, height: 7,
+                      decoration: BoxDecoration(
+                        color: AppColors.emerald,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      'LIVE · $liveCount coins in real time',
+                      style: TextStyle(fontSize: 11, color: AppColors.emerald,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ] else
+                    Text('Connecting live prices…',
+                        style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+                ],
+              ),
+              SizedBox(height: 14),
               Row(children: [
                 Expanded(
                   child: _StatCard(
@@ -120,7 +146,7 @@ class _GlobalStats extends ConsumerWidget {
                     subUp: up,
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: _StatCard(
                     label: '24h Volume',
@@ -128,7 +154,7 @@ class _GlobalStats extends ConsumerWidget {
                   ),
                 ),
               ]),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Row(children: [
                 Expanded(
                   child: _StatCard(
@@ -136,7 +162,7 @@ class _GlobalStats extends ConsumerWidget {
                     value: '${g.btcDominance.toStringAsFixed(1)}%',
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: _StatCard(
                     label: 'Active Cryptos',
@@ -166,20 +192,20 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceAlt),
+        border: Border.all(color: context.colors.surfaceAlt),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+          SizedBox(height: 4),
           Text(value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary)),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                color: context.colors.textPrimary)),
           if (sub != null) ...[
-            const SizedBox(height: 2),
+            SizedBox(height: 2),
             Text(sub!,
               style: TextStyle(
                 fontSize: 11,
@@ -213,48 +239,48 @@ class _FearDominanceRow extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.surfaceAlt),
+                border: Border.all(color: context.colors.surfaceAlt),
               ),
               child: Column(
                 children: [
-                  const Text('Fear & Greed',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  const SizedBox(height: 10),
+                  Text('Fear & Greed',
+                      style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+                  SizedBox(height: 10),
                   fgAsync.when(
-                    loading: () => const SizedBox(height: 80,
+                    loading: () => SizedBox(height: 80,
                         child: Center(child: CircularProgressIndicator(
                             color: AppColors.emerald, strokeWidth: 2))),
-                    error: (_, __) => const SizedBox(height: 80),
+                    error: (_, __) => SizedBox(height: 80),
                     data: (fg) => _FearGauge(value: fg.value, label: fg.classification),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
 
           // Market Dominance
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.surfaceAlt),
+                border: Border.all(color: context.colors.surfaceAlt),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Market Dominance',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  const SizedBox(height: 10),
+                  Text('Market Dominance',
+                      style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+                  SizedBox(height: 10),
                   glAsync.when(
-                    loading: () => const SizedBox(height: 80,
+                    loading: () => SizedBox(height: 80,
                         child: Center(child: CircularProgressIndicator(
                             color: AppColors.emerald, strokeWidth: 2))),
-                    error: (_, __) => const SizedBox(height: 80),
+                    error: (_, __) => SizedBox(height: 80),
                     data: (g) => _DominanceBars(entries: g.topDominances),
                   ),
                 ],
@@ -286,12 +312,12 @@ class _FearGauge extends StatelessWidget {
       children: [
         SizedBox(
           width: 80, height: 48,
-          child: CustomPaint(painter: _GaugePainter(value: value, color: _color)),
+          child: CustomPaint(painter: _GaugePainter(value: value, color: _color, bgColor: context.colors.surfaceAlt)),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         Text('$value',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _color)),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(label,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11, color: _color, fontWeight: FontWeight.w600)),
@@ -303,7 +329,8 @@ class _FearGauge extends StatelessWidget {
 class _GaugePainter extends CustomPainter {
   final int value;
   final Color color;
-  const _GaugePainter({required this.value, required this.color});
+  final Color bgColor;
+  const _GaugePainter({required this.value, required this.color, required this.bgColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -313,7 +340,7 @@ class _GaugePainter extends CustomPainter {
     final strokeW = 8.0;
 
     final bg = Paint()
-      ..color = AppColors.surfaceAlt
+      ..color = bgColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeW
       ..strokeCap = StrokeCap.round;
@@ -336,13 +363,13 @@ class _GaugePainter extends CustomPainter {
   bool shouldRepaint(_GaugePainter old) => old.value != value;
 }
 
-final _domColors = [
-  const Color(0xFFF97316),
-  const Color(0xFF6366F1),
-  const Color(0xFF3B82F6),
-  const Color(0xFF10B981),
-  const Color(0xFFF59E0B),
-  AppColors.surfaceAlt,
+const _domColors = [
+  Color(0xFFF97316),
+  Color(0xFF6366F1),
+  Color(0xFF3B82F6),
+  Color(0xFF10B981),
+  Color(0xFFF59E0B),
+  Color(0xFF52525B), // "Other" — neutral zinc
 ];
 
 class _DominanceBars extends StatelessWidget {
@@ -369,7 +396,7 @@ class _DominanceBars extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         ...entries.take(5).toList().asMap().entries.map((e) {
           final color = _domColors[e.key % _domColors.length];
           return Padding(
@@ -379,13 +406,13 @@ class _DominanceBars extends StatelessWidget {
                 Container(width: 8, height: 8,
                     decoration: BoxDecoration(color: color,
                         borderRadius: BorderRadius.circular(2))),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 Text(e.value.symbol,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecond,
+                    style: TextStyle(fontSize: 11, color: context.colors.textSecond,
                         fontWeight: FontWeight.w600)),
                 const Spacer(),
                 Text('${e.value.pct.toStringAsFixed(1)}%',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
               ],
             ),
           );
@@ -419,15 +446,15 @@ class _RankingSection extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildTab(0, 'Trending', Icons.local_fire_department_rounded),
-                const SizedBox(width: 8),
-                _buildTab(1, 'Gainers', Icons.trending_up_rounded),
-                const SizedBox(width: 8),
-                _buildTab(2, 'Losers', Icons.trending_down_rounded),
+                _buildTab(context, 0, 'Trending', Icons.local_fire_department_rounded),
+                SizedBox(width: 8),
+                _buildTab(context, 1, 'Gainers', Icons.trending_up_rounded),
+                SizedBox(width: 8),
+                _buildTab(context, 2, 'Losers', Icons.trending_down_rounded),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
 
           if (tab == 0)
             trendingAsync.when(
@@ -463,7 +490,7 @@ class _RankingSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildTab(int idx, String label, IconData icon) {
+  Widget _buildTab(BuildContext context, int idx, String label, IconData icon) {
     final active = tab == idx;
     return GestureDetector(
       onTap: () => onTabChange(idx),
@@ -471,21 +498,21 @@ class _RankingSection extends ConsumerWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? AppColors.emerald : AppColors.surface,
+          color: active ? AppColors.emerald : context.colors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: active ? AppColors.emerald : AppColors.surfaceAlt),
+              color: active ? AppColors.emerald : context.colors.surfaceAlt),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 14,
-                color: active ? Colors.white : AppColors.textMuted),
-            const SizedBox(width: 6),
+                color: active ? Colors.white : context.colors.textMuted),
+            SizedBox(width: 6),
             Text(label,
                 style: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : AppColors.textMuted,
+                  color: active ? Colors.white : context.colors.textMuted,
                 )),
           ],
         ),
@@ -498,7 +525,6 @@ class _RankingSection extends ConsumerWidget {
     return Column(
       children: coins.map((c) {
         final up = c.change >= 0;
-        final color = up ? AppColors.emerald : AppColors.red;
         return InkWell(
           onTap: () => context.push('/crypto/${c.id}'),
           borderRadius: BorderRadius.circular(10),
@@ -509,36 +535,40 @@ class _RankingSection extends ConsumerWidget {
                 SizedBox(
                   width: 22,
                   child: Text('#${c.rank}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 ClipOval(
                   child: Image.network(c.image, width: 32, height: 32,
                     errorBuilder: (_, __, ___) => _CoinFallback(symbol: c.symbol)),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(c.name,
-                          style: const TextStyle(fontSize: 13,
+                          style: TextStyle(fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary)),
+                              color: context.colors.textPrimary)),
                       Text(c.symbol,
-                          style: const TextStyle(fontSize: 11,
-                              color: AppColors.textMuted)),
+                          style: TextStyle(fontSize: 11,
+                              color: context.colors.textMuted)),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('\$${_fmtPrice(c.price)}',
-                        style: const TextStyle(fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary)),
-                    const SizedBox(height: 2),
+                    Consumer(builder: (_, ref, __) {
+                      final live  = ref.watch(realtimePriceProvider)[c.id];
+                      final price = live ?? c.price;
+                      return Text('\$${_fmtPrice(price)}',
+                          style: TextStyle(fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.colors.textPrimary));
+                    }),
+                    SizedBox(height: 2),
                     _ChangeBadge(change: c.change),
                   ],
                 ),
@@ -573,9 +603,9 @@ class _HeatmapSection extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Text('Heatmap',
+              Text('Heatmap',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary)),
+                      color: context.colors.textPrimary)),
               const Spacer(),
               ...List.generate(_periods.length, (i) {
                 final active = tab == i;
@@ -586,22 +616,22 @@ class _HeatmapSection extends ConsumerWidget {
                     margin: const EdgeInsets.only(left: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: active ? AppColors.emerald : AppColors.surface,
+                      color: active ? AppColors.emerald : context.colors.surface,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                          color: active ? AppColors.emerald : AppColors.surfaceAlt),
+                          color: active ? AppColors.emerald : context.colors.surfaceAlt),
                     ),
                     child: Text(_periods[i],
                         style: TextStyle(
                           fontSize: 11, fontWeight: FontWeight.w700,
-                          color: active ? Colors.white : AppColors.textMuted,
+                          color: active ? Colors.white : context.colors.textMuted,
                         )),
                   ),
                 );
               }),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           async.when(
             loading: () => const _LoadingBox(),
             error: (_, __) => const _ErrorBox(),
@@ -676,14 +706,14 @@ class _HeatTile extends StatelessWidget {
               child: Image.network(coin.image, width: 22, height: 22,
                 errorBuilder: (_, __, ___) => _CoinFallback(symbol: coin.symbol, size: 22)),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(coin.symbol.toUpperCase(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold,
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold,
                     color: Colors.white)),
             Text('${v >= 0 ? '+' : ''}${v.toStringAsFixed(1)}%',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 9, color: Colors.white70)),
+                style: TextStyle(fontSize: 9, color: Colors.white70)),
           ],
         ),
       ),
@@ -711,9 +741,9 @@ class _CryptoList extends ConsumerWidget {
             padding: const EdgeInsets.all(32),
             child: Column(
               children: [
-                const Icon(Icons.cloud_off_rounded, color: AppColors.textMuted, size: 44),
-                const SizedBox(height: 12),
-                Text('$e', style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                Icon(Icons.cloud_off_rounded, color: context.colors.textMuted, size: 44),
+                SizedBox(height: 12),
+                Text('$e', style: TextStyle(color: context.colors.textMuted, fontSize: 12),
                     textAlign: TextAlign.center),
               ],
             ),
@@ -738,7 +768,7 @@ class _CryptoList extends ConsumerWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.surfaceAlt),
+                      border: Border.all(color: context.colors.surfaceAlt),
                       borderRadius: const BorderRadius.only(
                         bottomLeft: Radius.circular(12),
                         bottomRight: Radius.circular(12),
@@ -748,15 +778,15 @@ class _CryptoList extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Ver mais  ${coins.length - 5} criptos',
-                          style: const TextStyle(
+                          'See ${coins.length - 5} more coins',
+                          style: TextStyle(
                             fontSize: 13,
                             color: AppColors.emerald,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.keyboard_arrow_down_rounded,
+                        SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down_rounded,
                             size: 18, color: AppColors.emerald),
                       ],
                     ),
@@ -787,71 +817,74 @@ class _CoinTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.surface,
+      color: context.colors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: const Row(
+      child: Row(
         children: [
-          SizedBox(width: 26, child: Text('#', style: TextStyle(fontSize: 11, color: AppColors.textMuted))),
+          SizedBox(width: 26, child: Text('#', style: TextStyle(fontSize: 11, color: context.colors.textMuted))),
           SizedBox(width: 10),
-          Expanded(child: Text('Coin', style: TextStyle(fontSize: 11, color: AppColors.textMuted))),
+          Expanded(child: Text('Coin', style: TextStyle(fontSize: 11, color: context.colors.textMuted))),
           SizedBox(width: 80, child: Text('Price', textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted))),
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted))),
           SizedBox(width: 60, child: Text('24h', textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted))),
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted))),
           SizedBox(width: 60, child: Text('7d', textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted))),
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted))),
         ],
       ),
     );
   }
 }
 
-class _CoinTableRow extends StatelessWidget {
+class _CoinTableRow extends ConsumerWidget {
   final CryptoMarket coin;
   final int rank;
   const _CoinTableRow({required this.coin, required this.rank});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final livePrice  = ref.watch(realtimePriceProvider)[coin.id];
+    final price      = livePrice ?? coin.currentPrice;
+
     return InkWell(
       onTap: () => context.push('/crypto/${coin.id}'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.surfaceAlt, width: 0.5)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
         ),
         child: Row(
           children: [
             SizedBox(
               width: 26,
               child: Text('$rank',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                  style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             ClipOval(
               child: Image.network(coin.image, width: 28, height: 28,
                 errorBuilder: (_, __, ___) => _CoinFallback(symbol: coin.symbol, size: 28)),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(coin.name,
                       maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                          color: context.colors.textPrimary)),
                   Text(coin.symbol.toUpperCase(),
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
                 ],
               ),
             ),
             SizedBox(
               width: 80,
-              child: Text('\$${_fmtPrice(coin.currentPrice)}',
+              child: Text('\$${_fmtPrice(price)}',
                   textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary)),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                      color: context.colors.textPrimary)),
             ),
             SizedBox(
               width: 60,
@@ -888,8 +921,8 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
     child: Text(title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary)),
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+            color: context.colors.textPrimary)),
   );
 }
 
@@ -926,14 +959,14 @@ class _CoinFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: size, height: size,
-    color: AppColors.surfaceAlt,
+    color: context.colors.surfaceAlt,
     child: Center(
       child: Text(
         symbol.isNotEmpty ? symbol[0].toUpperCase() : '?',
         style: TextStyle(
           fontSize: size * 0.4,
           fontWeight: FontWeight.bold,
-          color: AppColors.textMuted,
+          color: context.colors.textMuted,
         ),
       ),
     ),
@@ -943,7 +976,7 @@ class _CoinFallback extends StatelessWidget {
 class _LoadingBox extends StatelessWidget {
   const _LoadingBox();
   @override
-  Widget build(BuildContext context) => const SizedBox(
+  Widget build(BuildContext context) => SizedBox(
     height: 80,
     child: Center(child: CircularProgressIndicator(
         color: AppColors.emerald, strokeWidth: 2)),
@@ -953,10 +986,10 @@ class _LoadingBox extends StatelessWidget {
 class _ErrorBox extends StatelessWidget {
   const _ErrorBox();
   @override
-  Widget build(BuildContext context) => const SizedBox(
+  Widget build(BuildContext context) => SizedBox(
     height: 60,
-    child: Center(child: Text('Erro ao carregar',
-        style: TextStyle(color: AppColors.textMuted))),
+    child: Center(child: Text('Error loading',
+        style: TextStyle(color: context.colors.textMuted))),
   );
 }
 

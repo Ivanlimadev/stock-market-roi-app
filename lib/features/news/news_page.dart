@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/blog_post_model.dart';
-import '../../core/widgets/blog_post_sheet.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/shell/main_shell.dart';
 
 const _categories = [
   'All',
@@ -53,12 +54,14 @@ class _NewsPageState extends ConsumerState<NewsPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('News'),
+        title: Text('News'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded),
             onPressed: () => ref.invalidate(blogPostsProvider),
           ),
+          MainShellMenu.themeButton(),
+          MainShellMenu.button(),
         ],
         bottom: TabBar(
           controller: _tab,
@@ -66,31 +69,31 @@ class _NewsPageState extends ConsumerState<NewsPage>
           tabAlignment: TabAlignment.start,
           indicatorColor: AppColors.emerald,
           labelColor: AppColors.emerald,
-          unselectedLabelColor: AppColors.textMuted,
-          dividerColor: AppColors.surfaceAlt,
+          unselectedLabelColor: context.colors.textMuted,
+          dividerColor: context.colors.surfaceAlt,
           tabs: _categories.map((c) => Tab(text: c)).toList(),
         ),
       ),
       body: postsAsync.when(
         loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppColors.emerald)),
+            Center(child: CircularProgressIndicator(color: AppColors.emerald)),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded,
-                  color: AppColors.textMuted, size: 48),
-              const SizedBox(height: 12),
-              const Text('Failed to load articles',
-                  style: TextStyle(color: AppColors.textMuted)),
-              const SizedBox(height: 16),
+              Icon(Icons.cloud_off_rounded,
+                  color: context.colors.textMuted, size: 48),
+              SizedBox(height: 12),
+              Text('Failed to load articles',
+                  style: TextStyle(color: context.colors.textMuted)),
+              SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () => ref.invalidate(blogPostsProvider),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.emerald,
-                  side: const BorderSide(color: AppColors.emerald),
+                  side: BorderSide(color: AppColors.emerald),
                 ),
-                child: const Text('Retry'),
+                child: Text('Retry'),
               ),
             ],
           ),
@@ -103,15 +106,15 @@ class _NewsPageState extends ConsumerState<NewsPage>
                 : posts.where((p) => p.category == cat).toList();
 
             if (filtered.isEmpty) {
-              return const Center(
+              return Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.article_outlined,
-                        color: AppColors.textMuted, size: 48),
+                        color: context.colors.textMuted, size: 48),
                     SizedBox(height: 12),
                     Text('No articles yet',
-                        style: TextStyle(color: AppColors.textMuted)),
+                        style: TextStyle(color: context.colors.textMuted)),
                   ],
                 ),
               );
@@ -129,9 +132,9 @@ class _NewsPageState extends ConsumerState<NewsPage>
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) => const Divider(
+                separatorBuilder: (_, __) => Divider(
                     height: 1,
-                    color: AppColors.surfaceAlt,
+                    color: context.colors.surfaceAlt,
                     indent: 16,
                     endIndent: 16),
                 itemBuilder: (_, i) => _PostTile(post: filtered[i]),
@@ -154,7 +157,7 @@ class _PostTile extends StatelessWidget {
     final ago      = _timeAgo(post.publishedAt);
 
     return InkWell(
-      onTap: () => showBlogPostSheet(context, post),
+      onTap: () => context.push('/blog/${post.slug}', extra: post),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
@@ -176,7 +179,7 @@ class _PostTile extends StatelessWidget {
             else
               _ImagePlaceholder(color: catColor),
 
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
 
             Expanded(
               child: Column(
@@ -199,33 +202,33 @@ class _PostTile extends StatelessWidget {
                               fontWeight: FontWeight.w700),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(ago,
-                          style: const TextStyle(
-                              fontSize: 11, color: AppColors.textMuted)),
+                          style: TextStyle(
+                              fontSize: 11, color: context.colors.textMuted)),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   Text(
                     post.title,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                       height: 1.4,
                     ),
                   ),
                   if (post.excerpt != null && post.excerpt!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       post.excerpt!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textMuted,
+                          color: context.colors.textMuted,
                           height: 1.4),
                     ),
                   ],

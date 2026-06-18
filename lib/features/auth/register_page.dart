@@ -65,27 +65,27 @@ class _RegisterPageState extends State<RegisterPage> {
                       color: AppColors.emerald.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check_circle_outline, size: 48, color: AppColors.emerald),
+                    child: Icon(Icons.check_circle_outline, size: 48, color: AppColors.emerald),
                   ),
-                  const SizedBox(height: 24),
-                  const Text('Account created!',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 24),
+                  Text('Account created!',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+                  SizedBox(height: 12),
                   Text(
                     'We sent a confirmation link to ${_email.text}.\nOpen your email to activate your account.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textMuted, height: 1.5),
+                    style: TextStyle(color: context.colors.textMuted, height: 1.5),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
                   OutlinedButton(
                     onPressed: () => context.go('/login'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textSecond,
-                      side: const BorderSide(color: AppColors.border),
+                      foregroundColor: context.colors.textSecond,
+                      side: BorderSide(color: context.colors.border),
                       minimumSize: const Size(160, 44),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Go to Sign In'),
+                    child: Text('Go to Sign In'),
                   ),
                 ],
               ),
@@ -98,10 +98,10 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => context.go('/login'),
         ),
-        title: const Text('Create Account'),
+        title: Text('Create Account'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -109,45 +109,45 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               TextField(
                 controller: _name,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
+                style: TextStyle(color: context.colors.textPrimary),
+                decoration: InputDecoration(
                   labelText: 'Full Name',
-                  prefixIcon: Icon(Icons.person_outline, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.person_outline, color: context.colors.textMuted),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
+                style: TextStyle(color: context.colors.textPrimary),
+                decoration: InputDecoration(
                   labelText: 'Email',
-                  prefixIcon: Icon(Icons.email_outlined, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.email_outlined, color: context.colors.textMuted),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               TextField(
                 controller: _password,
                 obscureText: !_showPw,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: context.colors.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.lock_outlined, color: context.colors.textMuted),
                   suffixIcon: IconButton(
-                    icon: Icon(_showPw ? Icons.visibility_off : Icons.visibility, color: AppColors.textMuted),
+                    icon: Icon(_showPw ? Icons.visibility_off : Icons.visibility, color: context.colors.textMuted),
                     onPressed: () => setState(() => _showPw = !_showPw),
                   ),
                 ),
               ),
               if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
+                SizedBox(height: 12),
+                Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
               ],
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               FilledButton(
                 onPressed: _loading ? null : _register,
                 style: FilledButton.styleFrom(
@@ -157,8 +157,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: _loading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text('Create Account', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ],
           ),

@@ -21,7 +21,7 @@ class _GuestPerfil extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
+      appBar: AppBar(title: Text('Perfil')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -32,32 +32,32 @@ class _GuestPerfil extends StatelessWidget {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
+                  color: context.colors.surfaceAlt,
                   borderRadius: BorderRadius.circular(40),
                 ),
-                child: const Icon(Icons.person_outline_rounded,
-                    size: 40, color: AppColors.textMuted),
+                child: Icon(Icons.person_outline_rounded,
+                    size: 40, color: context.colors.textMuted),
               ),
-              const SizedBox(height: 24),
-              const Text(
+              SizedBox(height: 24),
+              Text(
                 'Crie sua conta',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 10),
-              const Text(
-                'Salve ativos, monte sua carteira e acompanhe favoritos.',
+              SizedBox(height: 10),
+              Text(
+                'Save assets, build your portfolio and track your favorites.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecond,
+                  color: context.colors.textSecond,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: 36),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -69,26 +69,26 @@ class _GuestPerfil extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text(
-                    'Criar conta grátis',
+                  child: Text(
+                    'Create free account',
                     style:
                         TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => context.push('/login'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.surfaceAlt),
+                    foregroundColor: context.colors.textPrimary,
+                    side: BorderSide(color: context.colors.surfaceAlt),
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Entrar',
                     style:
                         TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
@@ -131,13 +131,13 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
     final initials = email.isNotEmpty ? email[0].toUpperCase() : 'U';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
+      appBar: AppBar(title: Text('Perfil')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               // Avatar
               Container(
                 width: 80,
@@ -149,7 +149,7 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
                 child: Center(
                   child: Text(
                     initials,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: AppColors.emerald,
@@ -157,15 +157,15 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               Text(
                 email,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecond,
+                  color: context.colors.textSecond,
                 ),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // Divider section
               _InfoTile(
@@ -174,9 +174,9 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
                 value: email,
               ),
 
-              const SizedBox(height: 12),
-              const Divider(color: AppColors.surfaceAlt),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
+              Divider(color: context.colors.surfaceAlt),
+              SizedBox(height: 12),
 
               // Logout
               SizedBox(
@@ -184,16 +184,16 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
                 child: OutlinedButton.icon(
                   onPressed: _loading ? null : _signOut,
                   icon: _loading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text('Sair da conta'),
+                      : Icon(Icons.logout_rounded, size: 18),
+                  label: Text('Sair da conta'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.red,
-                    side: const BorderSide(color: AppColors.red),
+                    side: BorderSide(color: AppColors.red),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -219,24 +219,24 @@ class _InfoTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceAlt),
+        border: Border.all(color: context.colors.surfaceAlt),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
-          const SizedBox(width: 12),
+          Icon(icon, size: 18, color: context.colors.textMuted),
+          SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textMuted)),
-              const SizedBox(height: 2),
+                  style: TextStyle(
+                      fontSize: 11, color: context.colors.textMuted)),
+              SizedBox(height: 2),
               Text(value,
-                  style: const TextStyle(
-                      fontSize: 14, color: AppColors.textPrimary)),
+                  style: TextStyle(
+                      fontSize: 14, color: context.colors.textPrimary)),
             ],
           ),
         ],

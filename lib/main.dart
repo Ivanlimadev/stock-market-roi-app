@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
+import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 
 Future<void> main() async {
@@ -24,14 +25,17 @@ Future<void> main() async {
   runApp(const ProviderScope(child: App()));
 }
 
-class App extends StatelessWidget {
+class App extends ConsumerWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeProvider);
     return MaterialApp.router(
       title: 'Stock Market ROI',
-      theme: appTheme,
+      theme: appLightTheme,
+      darkTheme: appTheme,
+      themeMode: mode,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );

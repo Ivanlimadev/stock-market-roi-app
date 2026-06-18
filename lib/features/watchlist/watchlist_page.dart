@@ -12,16 +12,16 @@ class WatchlistPage extends StatelessWidget {
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Watchlist')),
+        appBar: AppBar(title: Text('Watchlist')),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.star_border_rounded, size: 64, color: AppColors.textMuted),
-              const SizedBox(height: 16),
-              const Text('Sign in to manage your watchlist',
-                style: TextStyle(color: AppColors.textMuted)),
-              const SizedBox(height: 24),
+              Icon(Icons.star_border_rounded, size: 64, color: context.colors.textMuted),
+              SizedBox(height: 16),
+              Text('Sign in to manage your watchlist',
+                style: TextStyle(color: context.colors.textMuted)),
+              SizedBox(height: 24),
               FilledButton(
                 onPressed: () => context.go('/login'),
                 style: FilledButton.styleFrom(
@@ -29,7 +29,7 @@ class WatchlistPage extends StatelessWidget {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Sign In'),
+                child: Text('Sign In'),
               ),
             ],
           ),
@@ -38,10 +38,10 @@ class WatchlistPage extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Watchlist')),
-      body: const Center(
+      appBar: AppBar(title: Text('Watchlist')),
+      body: Center(
         child: Text('Watchlist — coming soon',
-          style: TextStyle(color: AppColors.textMuted)),
+          style: TextStyle(color: context.colors.textMuted)),
       ),
     );
   }

@@ -14,3 +14,4 @@ final relatedPostsProvider =
   );
   return data.map((e) => BlogPost.fromJson(e as Map<String, dynamic>)).toList();
 });
+

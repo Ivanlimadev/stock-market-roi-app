@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/api/api_client.dart';
+import '../../core/shell/main_shell.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -86,12 +87,13 @@ class _FinancePageState extends ConsumerState<FinancePage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Finance'),
+        title: Text('Finance'),
+        actions: [MainShellMenu.themeButton(), MainShellMenu.button()],
         bottom: TabBar(
           controller: _tab,
           indicatorColor: AppColors.emerald,
           labelColor: AppColors.emerald,
-          unselectedLabelColor: AppColors.textMuted,
+          unselectedLabelColor: context.colors.textMuted,
           tabs: const [
             Tab(text: 'Earnings'),
             Tab(text: 'Dividends'),
@@ -125,8 +127,8 @@ class _EarningsTab extends ConsumerWidget {
         await ref.read(earningsProvider.future).then((_) {}).catchError((_) {});
       },
       child: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.emerald)),
-        error: (e, _) => _retryCenter('Earnings unavailable', () => ref.invalidate(earningsProvider)),
+        loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
+        error: (e, _) => _retryCenter(context, 'Earnings unavailable', () => ref.invalidate(earningsProvider)),
         data: (events) {
           // Group by date
           final grouped = <String, List<EarningsEvent>>{};
@@ -137,8 +139,8 @@ class _EarningsTab extends ConsumerWidget {
           final dates = grouped.keys.toList()..sort();
 
           if (dates.isEmpty) {
-            return const Center(
-              child: Text('No upcoming earnings', style: TextStyle(color: AppColors.textMuted)));
+            return Center(
+              child: Text('No upcoming earnings', style: TextStyle(color: context.colors.textMuted)));
           }
 
           return ListView.builder(
@@ -153,9 +155,9 @@ class _EarningsTab extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                     child: Text(label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w700,
-                        color: AppColors.textMuted, letterSpacing: 0.5)),
+                        color: context.colors.textMuted, letterSpacing: 0.5)),
                   ),
                   ...items.map((e) => _EarningsRow(event: e)),
                 ],
@@ -187,7 +189,7 @@ class _EarningsRow extends StatelessWidget {
             Container(
               width: 38, height: 38,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(9)),
+                color: context.colors.surfaceAlt, borderRadius: BorderRadius.circular(9)),
               clipBehavior: Clip.antiAlias,
               child: Image.network(
                 'https://assets.parqet.com/logos/symbol/${event.symbol}?format=png',
@@ -195,22 +197,22 @@ class _EarningsRow extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Center(
                   child: Text(
                     event.symbol.length >= 2 ? event.symbol.substring(0, 2) : event.symbol,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
-                      color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                      color: context.colors.textMuted)),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(event.symbol,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                   if (event.name != null)
                     Text(event.name!,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
                 ],
               ),
             ),
@@ -221,12 +223,12 @@ class _EarningsRow extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(4)),
+                      color: context.colors.surfaceAlt, borderRadius: BorderRadius.circular(4)),
                     child: Text(event.time == 'bmo' ? 'Pre-market' : 'After-hours',
-                      style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                      style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
                   ),
                 if (event.epsEstimate != null) ...[
-                  const SizedBox(height: 3),
+                  SizedBox(height: 3),
                   Text(
                     hasActual
                         ? 'EPS: \$${event.epsActual!.toStringAsFixed(2)}'
@@ -235,7 +237,7 @@ class _EarningsRow extends StatelessWidget {
                       fontSize: 12, fontWeight: FontWeight.w600,
                       color: hasActual
                           ? (beat ? AppColors.emerald : AppColors.red)
-                          : AppColors.textSecond),
+                          : context.colors.textSecond),
                   ),
                 ],
               ],
@@ -263,16 +265,16 @@ class _DividendsTab extends ConsumerWidget {
         await ref.read(dividendsProvider.future).then((_) {}).catchError((_) {});
       },
       child: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.emerald)),
-        error: (e, _) => _retryCenter('Dividends unavailable', () => ref.invalidate(dividendsProvider)),
+        loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
+        error: (e, _) => _retryCenter(context, 'Dividends unavailable', () => ref.invalidate(dividendsProvider)),
         data: (events) {
           if (events.isEmpty) {
-            return const Center(
-              child: Text('No upcoming dividends', style: TextStyle(color: AppColors.textMuted)));
+            return Center(
+              child: Text('No upcoming dividends', style: TextStyle(color: context.colors.textMuted)));
           }
           return ListView.separated(
             itemCount: events.length,
-            separatorBuilder: (_ , $) => const Divider(height: 1, color: AppColors.surfaceAlt),
+            separatorBuilder: (_ , $) => Divider(height: 1, color: context.colors.surfaceAlt),
             itemBuilder: (_, i) => _DividendRow(event: events[i]),
           );
         },
@@ -296,7 +298,7 @@ class _DividendRow extends StatelessWidget {
             Container(
               width: 38, height: 38,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(9)),
+                color: context.colors.surfaceAlt, borderRadius: BorderRadius.circular(9)),
               clipBehavior: Clip.antiAlias,
               child: Image.network(
                 'https://assets.parqet.com/logos/symbol/${event.symbol}?format=png',
@@ -304,22 +306,22 @@ class _DividendRow extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Center(
                   child: Text(
                     event.symbol.length >= 2 ? event.symbol.substring(0, 2) : event.symbol,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
-                      color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                      color: context.colors.textMuted)),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(event.symbol,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                   if (event.name != null)
                     Text(event.name!,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
                 ],
               ),
             ),
@@ -328,12 +330,12 @@ class _DividendRow extends StatelessWidget {
               children: [
                 if (event.amount != null)
                   Text('\$${event.amount!.toStringAsFixed(4)}',
-                    style: const TextStyle(fontWeight: FontWeight.w700,
+                    style: TextStyle(fontWeight: FontWeight.w700,
                       color: AppColors.emerald)),
                 if (event.exDate != null) ...[
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text('Ex: ${_fmtDate(event.exDate!)}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
                 ],
               ],
             ),
@@ -346,22 +348,22 @@ class _DividendRow extends StatelessWidget {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-Widget _retryCenter(String msg, VoidCallback onRetry) {
+Widget _retryCenter(BuildContext context, String msg, VoidCallback onRetry) {
   return Center(
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.textMuted),
-        const SizedBox(height: 12),
-        Text(msg, style: const TextStyle(color: AppColors.textMuted)),
-        const SizedBox(height: 16),
+        Icon(Icons.cloud_off_rounded, size: 48, color: context.colors.textMuted),
+        SizedBox(height: 12),
+        Text(msg, style: TextStyle(color: context.colors.textMuted)),
+        SizedBox(height: 16),
         OutlinedButton(
           onPressed: onRetry,
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.emerald,
-            side: const BorderSide(color: AppColors.emerald),
+            side: BorderSide(color: AppColors.emerald),
           ),
-          child: const Text('Retry'),
+          child: Text('Retry'),
         ),
       ],
     ),

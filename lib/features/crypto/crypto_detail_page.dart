@@ -5,10 +5,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/api/api_client.dart';
-import '../../core/widgets/blog_post_sheet.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/providers/realtime_price_provider.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -163,9 +164,9 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
           widget.coinId[0].toUpperCase() + widget.coinId.substring(1),
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
+          IconButton(icon: Icon(Icons.refresh_rounded), onPressed: _refresh),
           IconButton(
-            icon: const Icon(Icons.open_in_new),
+            icon: Icon(Icons.open_in_new),
             onPressed: () => launchUrl(
               Uri.parse('https://stockmarketroi.com/crypto/${widget.coinId}'),
               mode: LaunchMode.externalApplication,
@@ -174,24 +175,24 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
         ],
       ),
       body: async.when(
-        loading: () => const Center(
+        loading: () => Center(
             child: CircularProgressIndicator(color: AppColors.emerald)),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.textMuted),
-              const SizedBox(height: 12),
+              Icon(Icons.cloud_off_rounded, size: 48, color: context.colors.textMuted),
+              SizedBox(height: 12),
               Text('Falha ao carregar ${widget.coinId}',
-                  style: const TextStyle(color: AppColors.textMuted)),
-              const SizedBox(height: 16),
+                  style: TextStyle(color: context.colors.textMuted)),
+              SizedBox(height: 16),
               OutlinedButton(
                 onPressed: _refresh,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.emerald,
-                  side: const BorderSide(color: AppColors.emerald),
+                  side: BorderSide(color: AppColors.emerald),
                 ),
-                child: const Text('Tentar novamente'),
+                child: Text('Tentar novamente'),
               ),
             ],
           ),
@@ -224,10 +225,13 @@ class _CryptoBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final md      = coin.marketData;
-    final up      = (md.change24hPct ?? 0) >= 0;
-    final color   = up ? AppColors.emerald : AppColors.red;
-    final history = ref.watch(cryptoHistoryProvider((id: coinId, days: days)));
+    final md         = coin.marketData;
+    final livePrice  = ref.watch(realtimePriceProvider)[coinId];
+    final isLive     = livePrice != null;
+    final price      = livePrice ?? md.currentPrice;
+    final up         = (md.change24hPct ?? 0) >= 0;
+    final color      = up ? AppColors.emerald : AppColors.red;
+    final history    = ref.watch(cryptoHistoryProvider((id: coinId, days: days)));
 
     return ListView(
       children: [
@@ -243,18 +247,18 @@ class _CryptoBody extends ConsumerWidget {
                       symbol: coin.symbol, size: 52),
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(coin.name,
-                        style: const TextStyle(fontSize: 18,
+                        style: TextStyle(fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary)),
+                            color: context.colors.textPrimary)),
                     Text(coin.symbol.toUpperCase(),
-                        style: const TextStyle(fontSize: 13,
-                            color: AppColors.textMuted)),
+                        style: TextStyle(fontSize: 13,
+                            color: context.colors.textMuted)),
                   ],
                 ),
               ),
@@ -262,13 +266,13 @@ class _CryptoBody extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceAlt,
+                    color: context.colors.surfaceAlt,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text('#${md.marketCapRank}',
-                      style: const TextStyle(fontSize: 13,
+                      style: TextStyle(fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textMuted)),
+                          color: context.colors.textMuted)),
                 ),
             ],
           ),
@@ -281,11 +285,11 @@ class _CryptoBody extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '\$${_fmtPrice(md.currentPrice)}',
-                style: const TextStyle(fontSize: 36,
-                    fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                '\$${_fmtPrice(price)}',
+                style: TextStyle(fontSize: 36,
+                    fontWeight: FontWeight.bold, color: context.colors.textPrimary),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: _ChangeBadge(value: md.change24hPct ?? 0, fontSize: 14),
@@ -295,11 +299,27 @@ class _CryptoBody extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
-          child: Text(
-            md.change24h != null
-                ? '${(md.change24h! >= 0 ? '+' : '')}\$${_fmtPrice(md.change24h!.abs())} hoje'
-                : 'Variação 24h',
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          child: Row(
+            children: [
+              if (isLive) ...[
+                Container(
+                  width: 7, height: 7,
+                  decoration: BoxDecoration(
+                    color: AppColors.emerald, shape: BoxShape.circle),
+                ),
+                SizedBox(width: 5),
+                Text('LIVE',
+                    style: TextStyle(fontSize: 11, color: AppColors.emerald,
+                        fontWeight: FontWeight.w700)),
+                SizedBox(width: 10),
+              ],
+              Text(
+                md.change24h != null
+                    ? '${(md.change24h! >= 0 ? '+' : '')}\$${_fmtPrice(md.change24h!.abs())} today'
+                    : '24h Change',
+                style: TextStyle(fontSize: 12, color: context.colors.textMuted),
+              ),
+            ],
           ),
         ),
 
@@ -316,15 +336,15 @@ class _CryptoBody extends ConsumerWidget {
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: active ? AppColors.emerald : AppColors.surface,
+                    color: active ? AppColors.emerald : context.colors.surface,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: active ? AppColors.emerald : AppColors.surfaceAlt),
+                        color: active ? AppColors.emerald : context.colors.surfaceAlt),
                   ),
                   child: Text(_periods[i].label,
                       style: TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w700,
-                        color: active ? Colors.white : AppColors.textMuted,
+                        color: active ? Colors.white : context.colors.textMuted,
                       )),
                 ),
               );
@@ -338,10 +358,10 @@ class _CryptoBody extends ConsumerWidget {
             height: 180,
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(child: CircularProgressIndicator(
+            child: Center(child: CircularProgressIndicator(
                 color: AppColors.emerald, strokeWidth: 2)),
           ),
           error: (_, __) => const SizedBox.shrink(),
@@ -381,7 +401,7 @@ class _CryptoBody extends ConsumerWidget {
         // ── Related articles ──────────────────────────────────────────────────
         _RelatedArticles(coinId: coinId),
 
-        const SizedBox(height: 32),
+        SizedBox(height: 32),
       ],
     );
   }
@@ -417,7 +437,7 @@ class _PriceChart extends StatelessWidget {
             titlesData: const FlTitlesData(show: false),
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (_) => AppColors.surface,
+                getTooltipColor: (_) => context.colors.surface,
                 getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
                   '\$${_fmtPrice(s.y)}',
                   TextStyle(color: color, fontWeight: FontWeight.w600),
@@ -456,15 +476,15 @@ class _PeriodChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.surfaceAlt),
+        border: Border.all(color: context.colors.surfaceAlt),
       ),
       child: Column(
         children: [
           Text(label,
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-          const SizedBox(height: 2),
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+          SizedBox(height: 2),
           Text('${up ? '+' : ''}${value.toStringAsFixed(2)}%',
               style: TextStyle(fontSize: 12, color: color,
                   fontWeight: FontWeight.w700)),
@@ -485,13 +505,13 @@ class _MarketStats extends StatelessWidget {
     final rows = <(String, String)>[
       if (md.marketCap   != null) ('Market Cap',   _fmtBig(md.marketCap)),
       if (md.totalVolume != null) ('Volume 24h',   _fmtBig(md.totalVolume)),
-      if (md.high24h     != null) ('Máxima 24h', '\$${_fmtPrice(md.high24h!)}'),
-      if (md.low24h      != null) ('Mínima 24h',  '\$${_fmtPrice(md.low24h!)}'),
+      if (md.high24h     != null) ('24h High', '\$${_fmtPrice(md.high24h!)}'),
+      if (md.low24h      != null) ('24h Low',  '\$${_fmtPrice(md.low24h!)}'),
     ];
     if (rows.isEmpty) return const SizedBox.shrink();
 
     return _CardSection(
-      title: 'Dados de Mercado',
+      title: 'Market Data',
       child: _RowList(rows: rows),
     );
   }
@@ -584,20 +604,20 @@ class _SupplyBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Circulante / Max',
-                  style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              Text('Circulante / Max',
+                  style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
               Text('${(pct * 100).toStringAsFixed(1)}%',
-                  style: const TextStyle(fontSize: 11,
+                  style: TextStyle(fontSize: 11,
                       fontWeight: FontWeight.w600, color: AppColors.emerald)),
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 6,
-              backgroundColor: AppColors.surfaceAlt,
+              backgroundColor: context.colors.surfaceAlt,
               valueColor: const AlwaysStoppedAnimation(AppColors.emerald),
             ),
           ),
@@ -631,16 +651,16 @@ class _AboutSectionState extends State<_AboutSection> {
             Text(widget.text,
               maxLines: _expanded ? null : 5,
               overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13,
-                  color: AppColors.textSecond, height: 1.65)),
+              style: TextStyle(fontSize: 13,
+                  color: context.colors.textSecond, height: 1.65)),
             TextButton(
               onPressed: () => setState(() => _expanded = !_expanded),
               style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(0, 32),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              child: Text(_expanded ? 'Ver menos' : 'Ler mais',
-                  style: const TextStyle(color: AppColors.emerald, fontSize: 13)),
+              child: Text(_expanded ? 'Show less' : 'Read more',
+                  style: TextStyle(color: AppColors.emerald, fontSize: 13)),
             ),
           ],
         ),
@@ -696,11 +716,11 @@ class _ArticleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = catColors[post.category] ?? AppColors.emerald;
     return InkWell(
-      onTap: () => showBlogPostSheet(context, post),
+      onTap: () => context.push('/blog/${post.slug}', extra: post),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.surfaceAlt, width: 0.5)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
         ),
         child: Row(
           children: [
@@ -717,18 +737,18 @@ class _ArticleTile extends StatelessWidget {
                         style: TextStyle(fontSize: 10, color: color,
                             fontWeight: FontWeight.w700)),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   Text(post.title,
                       maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13,
+                      style: TextStyle(fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary)),
+                          color: context.colors.textPrimary)),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            const Icon(Icons.chevron_right_rounded,
-                size: 18, color: AppColors.textMuted),
+            SizedBox(width: 12),
+            Icon(Icons.chevron_right_rounded,
+                size: 18, color: context.colors.textMuted),
           ],
         ),
       ),
@@ -750,15 +770,15 @@ class _CardSection extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
         child: Text(title,
-            style: const TextStyle(fontSize: 15,
-                fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            style: TextStyle(fontSize: 15,
+                fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
       ),
       Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.surfaceAlt),
+          border: Border.all(color: context.colors.surfaceAlt),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
@@ -793,19 +813,19 @@ class _RowList extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           decoration: BoxDecoration(
-            border: isLast ? null : const Border(
-                bottom: BorderSide(color: AppColors.surfaceAlt, width: 0.5)),
+            border: isLast ? null : Border(
+                bottom: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
           ),
           child: Row(
             children: [
               Text(label,
-                  style: const TextStyle(fontSize: 13,
-                      color: AppColors.textMuted)),
+                  style: TextStyle(fontSize: 13,
+                      color: context.colors.textMuted)),
               const Spacer(),
               Text(value,
                   style: TextStyle(fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: valueColor ?? AppColors.textPrimary)),
+                      color: valueColor ?? context.colors.textPrimary)),
             ],
           ),
         );
@@ -844,12 +864,12 @@ class _CoinFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: size, height: size, color: AppColors.surfaceAlt,
+    width: size, height: size, color: context.colors.surfaceAlt,
     child: Center(
       child: Text(
         symbol.isNotEmpty ? symbol[0].toUpperCase() : '?',
         style: TextStyle(fontSize: size * 0.4,
-            fontWeight: FontWeight.bold, color: AppColors.textMuted),
+            fontWeight: FontWeight.bold, color: context.colors.textMuted),
       ),
     ),
   );

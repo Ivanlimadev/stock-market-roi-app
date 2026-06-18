@@ -22,8 +22,8 @@ class _AuthPromptSheet extends StatelessWidget {
     final label = action ?? 'salvar este ativo';
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.background,
+      decoration: BoxDecoration(
+        color: context.colors.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
@@ -36,7 +36,7 @@ class _AuthPromptSheet extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(bottom: 24),
             decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
+              color: context.colors.surfaceAlt,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -49,30 +49,30 @@ class _AuthPromptSheet extends StatelessWidget {
               color: AppColors.emerald.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(32),
             ),
-            child: const Icon(Icons.lock_open_rounded,
+            child: Icon(Icons.lock_open_rounded,
                 size: 30, color: AppColors.emerald),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
 
-          const Text(
+          Text(
             'Crie sua conta gratuita',
             style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
-            'Para $label você precisa de uma conta.\nÉ rápido e gratuito!',
-            style: const TextStyle(
+            'To $label you need an account.\nIt\'s quick and free!',
+            style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecond,
+              color: context.colors.textSecond,
               height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 28),
+          SizedBox(height: 28),
 
           SizedBox(
             width: double.infinity,
@@ -88,13 +88,13 @@ class _AuthPromptSheet extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text(
-                'Criar conta grátis',
+              child: Text(
+                'Create free account',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
@@ -103,24 +103,24 @@ class _AuthPromptSheet extends StatelessWidget {
                 context.push('/login');
               },
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                side: const BorderSide(color: AppColors.surfaceAlt),
+                foregroundColor: context.colors.textPrimary,
+                side: BorderSide(color: context.colors.surfaceAlt),
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text(
-                'Já tenho conta — Entrar',
+              child: Text(
+                'I already have an account — Log in',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Agora não',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            child: Text(
+              'Not now',
+              style: TextStyle(fontSize: 13, color: context.colors.textMuted),
             ),
           ),
         ],

@@ -12,6 +12,8 @@ import '../../features/news/news_page.dart';
 import '../../features/crypto/crypto_page.dart';
 import '../../features/crypto/crypto_detail_page.dart';
 import '../../features/perfil/perfil_page.dart';
+import '../../features/blog/blog_post_page.dart';
+import '../../core/models/blog_post_model.dart';
 import '../shell/main_shell.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -46,6 +48,17 @@ final appRouter = GoRouter(
       path: '/crypto/:id',
       builder: (_, state) =>
           CryptoDetailPage(coinId: state.pathParameters['id'] ?? ''),
+    ),
+    GoRoute(
+      path: '/blog/:slug',
+      builder: (_, state) {
+        final slug = state.pathParameters['slug'] ?? '';
+        final extra = state.extra;
+        return BlogPostPage(
+          slug: slug,
+          post: extra is BlogPost ? extra : null,
+        );
+      },
     ),
 
     // Main shell with bottom nav

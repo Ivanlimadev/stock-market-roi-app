@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,8 +9,10 @@ import '../../core/providers/stock_detail_provider.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/stock_detail_model.dart';
 import '../../core/models/blog_post_model.dart';
-import '../../core/widgets/blog_post_sheet.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/utils/formatters.dart';
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 class StockDetailPage extends ConsumerWidget {
   final String symbol;
@@ -24,14 +28,14 @@ class StockDetailPage extends ConsumerWidget {
         title: Text(sym),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded),
             onPressed: () {
               ref.invalidate(stockDetailProvider(sym));
               ref.invalidate(stockHistoryProvider(sym));
             },
           ),
           IconButton(
-            icon: const Icon(Icons.open_in_new),
+            icon: Icon(Icons.open_in_new),
             onPressed: () => launchUrl(
               Uri.parse('https://stockmarketroi.com/stocks/${sym.toLowerCase()}'),
               mode: LaunchMode.externalApplication,
@@ -40,23 +44,23 @@ class StockDetailPage extends ConsumerWidget {
         ],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.emerald)),
+        loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.textMuted),
-              const SizedBox(height: 12),
-              Text('Failed to load $sym',
-                style: const TextStyle(color: AppColors.textMuted)),
-              const SizedBox(height: 16),
+              Icon(Icons.cloud_off_rounded, size: 48, color: context.colors.textMuted),
+              SizedBox(height: 12),
+              Text('Falha ao carregar $sym',
+                  style: TextStyle(color: context.colors.textMuted)),
+              SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () => ref.invalidate(stockDetailProvider(sym)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.emerald,
-                  side: const BorderSide(color: AppColors.emerald),
+                  side: BorderSide(color: AppColors.emerald),
                 ),
-                child: const Text('Retry'),
+                child: Text('Tentar novamente'),
               ),
             ],
           ),
@@ -67,73 +71,52 @@ class StockDetailPage extends ConsumerWidget {
   }
 }
 
-class _Body extends ConsumerWidget {
+// ── Body ──────────────────────────────────────────────────────────────────────
+
+class _Body extends ConsumerStatefulWidget {
   final StockDetail stock;
   final String sym;
   const _Body({required this.stock, required this.sym});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends ConsumerState<_Body> {
+  int _periodIdx = 2; // default 3M
+
+  static const _periods = [
+    (label: '1S',  take: 5),
+    (label: '1M',  take: 21),
+    (label: '3M',  take: 63),
+    (label: '6M',  take: 126),
+    (label: '1A',  take: 252),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final stock   = widget.stock;
+    final sym     = widget.sym;
+    final info    = stock.info;
     final up      = stock.changePct >= 0;
     final color   = up ? AppColors.emerald : AppColors.red;
     final history = ref.watch(stockHistoryProvider(sym));
 
     return ListView(
       children: [
-        // ── Header ────────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52, height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.network(
-                  'https://assets.parqet.com/logos/symbol/$sym?format=png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => Center(
-                    child: Text(sym.length >= 2 ? sym.substring(0, 2) : sym,
-                      style: const TextStyle(fontWeight: FontWeight.bold,
-                        fontSize: 16, color: AppColors.textMuted)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(stock.name,
-                      style: const TextStyle(fontSize: 16,
-                        fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    if (stock.exchange != null)
-                      Text(stock.exchange!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                    if (stock.info?.sector != null)
-                      Text(stock.info!.sector!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        // ── Header ──────────────────────────────────────────────────────────
+        _Header(stock: stock),
 
-        // ── Price ─────────────────────────────────────────────────────────
+        // ── Price ───────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(fmtStockPrice(stock.currentPrice),
-                style: const TextStyle(fontSize: 36,
-                  fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              const SizedBox(width: 10),
+                  style: TextStyle(fontSize: 36,
+                      fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+              SizedBox(width: 10),
               Padding(
                 padding: const EdgeInsets.only(bottom: 5),
                 child: Container(
@@ -144,49 +127,171 @@ class _Body extends ConsumerWidget {
                   ),
                   child: Text(
                     '${up ? '+' : ''}${stock.changePct.toStringAsFixed(2)}%',
-                    style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w700)),
+                    style: TextStyle(fontSize: 14, color: color,
+                        fontWeight: FontWeight.w700)),
                 ),
               ),
             ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 14),
           child: Text(
-            '${up ? '+' : ''}${fmtStockPrice(stock.change.abs())} today',
+            '${up ? '+' : ''}${fmtStockPrice(stock.change.abs())} hoje',
             style: TextStyle(fontSize: 13, color: color)),
         ),
 
-        // ── Chart (3 months) ──────────────────────────────────────────────
+        // ── Period tabs ──────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: Row(
+            children: List.generate(_periods.length, (i) {
+              final active = _periodIdx == i;
+              return GestureDetector(
+                onTap: () => setState(() => _periodIdx = i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.emerald : context.colors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: active ? AppColors.emerald : context.colors.surfaceAlt),
+                  ),
+                  child: Text(_periods[i].label,
+                      style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700,
+                        color: active ? Colors.white : context.colors.textMuted,
+                      )),
+                ),
+              );
+            }),
+          ),
+        ),
+
+        // ── Chart ───────────────────────────────────────────────────────────
         history.when(
           loading: () => Container(
             height: 180,
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
-            child: const Center(
-              child: CircularProgressIndicator(color: AppColors.emerald, strokeWidth: 2)),
+              color: context.colors.surface, borderRadius: BorderRadius.circular(12)),
+            child: Center(
+                child: CircularProgressIndicator(color: AppColors.emerald, strokeWidth: 2)),
           ),
-          error: (e, _) => const SizedBox.shrink(),
-          data: (bars) => bars.length < 2
-              ? const SizedBox.shrink()
-              : _Chart(bars: bars, color: color),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (bars) {
+            if (bars.length < 2) return const SizedBox.shrink();
+            final take = _periods[_periodIdx].take;
+            final slice = bars.length > take
+                ? bars.sublist(bars.length - take)
+                : bars;
+            return _Chart(bars: slice, color: color);
+          },
         ),
 
-        const SizedBox(height: 8),
+        SizedBox(height: 12),
 
-        // ── Key Statistics ────────────────────────────────────────────────
-        if (stock.info != null) _KeyStats(info: stock.info!, stock: stock),
+        // ── AI Insight ───────────────────────────────────────────────────────
+        _AIInsightCard(sym: sym),
 
-        // ── About ─────────────────────────────────────────────────────────
-        if (stock.info?.description != null && stock.info!.description!.isNotEmpty)
-          _About(text: stock.info!.description!),
+        // ── Analyst Consensus ────────────────────────────────────────────────
+        if (info?.recommendationKey != null)
+          _AnalystCard(info: info!, price: stock.currentPrice),
 
-        // ── Related Articles ──────────────────────────────────────────────
+        // ── Investment Simulator ─────────────────────────────────────────────
+        _InvestmentSimulator(sym: sym, dividends: stock.dividends),
+
+        // ── Earnings ────────────────────────────────────────────────────────
+        if (info?.nextEarningsDate != null || info?.eps != null)
+          _EarningsCard(info: info!),
+
+        // ── Key Statistics ───────────────────────────────────────────────────
+        if (info != null) _KeyStats(info: info, stock: stock),
+
+        // ── Dividends ────────────────────────────────────────────────────────
+        if (stock.dividends.isNotEmpty)
+          _DividendsCard(dividends: stock.dividends, info: info),
+
+        // ── Buy & Hold Checklist ─────────────────────────────────────────────
+        if (info != null) _BuyHoldChecklist(
+            info: info, price: stock.currentPrice, dividends: stock.dividends),
+
+        // ── Fair Value ───────────────────────────────────────────────────────
+        if (info != null) _FairValueCard(info: info),
+
+        // ── Company Info ─────────────────────────────────────────────────────
+        if (info != null) _CompanyInfo(info: info, sym: sym),
+
+        // ── About ────────────────────────────────────────────────────────────
+        if (info?.description != null && info!.description!.isNotEmpty)
+          _About(text: info.description!),
+
+        // ── Related Articles ──────────────────────────────────────────────────
         _RelatedArticles(sym: sym),
 
-        const SizedBox(height: 32),
+        SizedBox(height: 32),
       ],
+    );
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  final StockDetail stock;
+  const _Header({required this.stock});
+
+  @override
+  Widget build(BuildContext context) {
+    final info = stock.info;
+    final breadcrumb = [info?.sector, info?.industry]
+        .whereType<String>()
+        .join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: context.colors.surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network(
+              'https://assets.parqet.com/logos/symbol/${stock.symbol}?format=png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Center(
+                child: Text(
+                  stock.symbol.length >= 2 ? stock.symbol.substring(0, 2) : stock.symbol,
+                  style: TextStyle(fontWeight: FontWeight.bold,
+                      fontSize: 16, color: context.colors.textMuted)),
+              ),
+            ),
+          ),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(stock.name,
+                    style: TextStyle(fontSize: 16,
+                        fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+                if (stock.exchange != null)
+                  Text(stock.exchange!,
+                      style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
+                if (breadcrumb.isNotEmpty)
+                  Text(breadcrumb,
+                      style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -200,15 +305,12 @@ class _Chart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // bars come newest-first from the endpoint, reverse for chronological
-    final sorted = bars.reversed.toList();
-    final spots  = sorted.asMap().entries
+    final spots = bars.asMap().entries
         .map((e) => FlSpot(e.key.toDouble(), e.value.close))
         .toList();
-
-    final prices = sorted.map((b) => b.close);
-    final minY   = prices.reduce((a, b) => a < b ? a : b);
-    final maxY   = prices.reduce((a, b) => a > b ? a : b);
+    final prices = bars.map((b) => b.close);
+    final minY   = prices.reduce(math.min);
+    final maxY   = prices.reduce(math.max);
     final pad    = (maxY - minY) * 0.12;
 
     return Padding(
@@ -224,9 +326,9 @@ class _Chart extends StatelessWidget {
             titlesData: const FlTitlesData(show: false),
             lineTouchData: LineTouchData(
               touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (_) => AppColors.surface,
+                getTooltipColor: (_) => context.colors.surface,
                 getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
-                  '\$${s.y.toStringAsFixed(2)}',
+                  fmtStockPrice(s.y),
                   TextStyle(color: color, fontWeight: FontWeight.w600),
                 )).toList(),
               ),
@@ -239,12 +341,164 @@ class _Chart extends StatelessWidget {
                 barWidth: 2,
                 dotData: const FlDotData(show: false),
                 belowBarData: BarAreaData(
-                  show: true, color: color.withValues(alpha: 0.1)),
+                    show: true, color: color.withValues(alpha: 0.1)),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Analyst Consensus ─────────────────────────────────────────────────────────
+
+class _AnalystCard extends StatelessWidget {
+  final StockInfo info;
+  final double price;
+  const _AnalystCard({required this.info, required this.price});
+
+  ({String label, Color color}) get _verdict {
+    final r = (info.recommendationKey ?? '').toLowerCase();
+    if (r.contains('strong_buy') || r.contains('strongbuy'))
+      return (label: 'Strong Buy', color: AppColors.emerald);
+    if (r == 'buy')
+      return (label: 'Comprar', color: AppColors.emerald);
+    if (r == 'hold' || r == 'neutral')
+      return (label: 'Neutro', color: const Color(0xFFF59E0B));
+    if (r.contains('underperform') || r == 'sell')
+      return (label: 'Vender', color: AppColors.red);
+    return (label: r, color: AppColors.textMuted);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = _verdict;
+    return _Section(
+      title: 'Consenso Analistas',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: v.color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(v.label,
+                      style: TextStyle(fontSize: 15, color: v.color,
+                          fontWeight: FontWeight.w800)),
+                ),
+                if (info.numberOfAnalystOpinions != null) ...[
+                  SizedBox(width: 10),
+                  Text('${info.numberOfAnalystOpinions} analistas',
+                      style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
+                ],
+              ],
+            ),
+            if (info.targetMeanPrice != null) ...[
+              SizedBox(height: 14),
+              Row(
+                children: [
+                  _TargetChip('Low',     info.targetLowPrice,  price),
+                  SizedBox(width: 8),
+                  _TargetChip('Avg',     info.targetMeanPrice, price, highlight: true),
+                  SizedBox(width: 8),
+                  _TargetChip('High',    info.targetHighPrice, price),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TargetChip extends StatelessWidget {
+  final String label;
+  final double? target;
+  final double price;
+  final bool highlight;
+  const _TargetChip(this.label, this.target, this.price, {this.highlight = false});
+
+  @override
+  Widget build(BuildContext context) {
+    if (target == null) return const SizedBox.shrink();
+    final pct = ((target! - price) / price * 100);
+    final up  = pct >= 0;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: highlight ? AppColors.emerald.withValues(alpha: 0.08) : context.colors.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: highlight ? AppColors.emerald.withValues(alpha: 0.3) : context.colors.surfaceAlt),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+            SizedBox(height: 4),
+            Text(fmtStockPrice(target!),
+                style: TextStyle(fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: highlight ? AppColors.emerald : context.colors.textPrimary)),
+            Text('${up ? '+' : ''}${pct.toStringAsFixed(1)}%',
+                style: TextStyle(fontSize: 10,
+                    color: up ? AppColors.emerald : AppColors.red,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Earnings ──────────────────────────────────────────────────────────────────
+
+class _EarningsCard extends StatelessWidget {
+  final StockInfo info;
+  const _EarningsCard({required this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    int? daysUntil;
+    String? formattedDate;
+    if (info.nextEarningsDate != null) {
+      try {
+        final dt   = DateTime.parse(info.nextEarningsDate!);
+        final diff = dt.difference(DateTime.now());
+        daysUntil  = diff.inDays;
+        formattedDate =
+            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      } catch (_) {}
+    }
+
+    final rows = <(String, String)>[
+      if (formattedDate != null)
+        ('Next earnings', formattedDate),
+      if (daysUntil != null && daysUntil >= 0)
+        ('Days remaining', '$daysUntil days'),
+      if (info.eps != null && info.eps! != 0)
+        ('EPS (TTM)', '\$${info.eps!.toStringAsFixed(2)}'),
+      if (info.pe != null && info.pe! > 0)
+        ('P/E (TTM)', info.pe!.toStringAsFixed(1)),
+      if (info.forwardPE != null && info.forwardPE! > 0)
+        ('Forward P/E', info.forwardPE!.toStringAsFixed(1)),
+      if (info.pegRatio != null && info.pegRatio! > 0)
+        ('PEG Ratio', info.pegRatio!.toStringAsFixed(2)),
+    ];
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return _Section(
+      title: 'Resultados',
+      child: _RowList(rows: rows),
     );
   }
 }
@@ -258,112 +512,475 @@ class _KeyStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String fmtBig(double? v) => fmtBigUsd(v);
+    String fmtN(double? v, {int d = 2}) =>
+        v == null || v == 0 ? '—' : v.toStringAsFixed(d);
     String fmtVol(double? v) {
       if (v == null || v == 0) return '—';
+      if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(1)}B';
       if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)}M';
       if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(0)}K';
       return v.toStringAsFixed(0);
     }
-    String fmtN(double? v, {int d = 2}) => v == null || v == 0 ? '—' : v.toStringAsFixed(d);
+    String fmtPct(double? v) =>
+        v == null ? '—' : '${(v * 100).toStringAsFixed(2)}%';
 
-    // Analyst consensus chip
-    String? consensus;
-    Color? consensusColor;
-    if (info.recommendationKey != null) {
-      final r = info.recommendationKey!.toLowerCase();
-      if (r.contains('strong_buy') || r.contains('strongbuy')) {
-        consensus = 'Strong Buy'; consensusColor = AppColors.emerald;
-      } else if (r == 'buy') {
-        consensus = 'Buy'; consensusColor = AppColors.emerald;
-      } else if (r == 'hold') {
-        consensus = 'Hold'; consensusColor = const Color(0xFFF59E0B);
-      } else if (r.contains('sell')) {
-        consensus = 'Sell'; consensusColor = AppColors.red;
-      }
+    return _Section(
+      title: 'Statistics',
+      child: Column(
+        children: [
+          // Valuation
+          _SubHeader('Valuation'),
+          _RowList(rows: [
+            ('Market Cap',    fmtBigUsd(info.marketCap)),
+            ('P/E (TTM)',     info.pe != null && info.pe! > 0 ? fmtN(info.pe) : '—'),
+            ('Forward P/E',   info.forwardPE != null && info.forwardPE! > 0 ? fmtN(info.forwardPE) : '—'),
+            ('PEG Ratio',     info.pegRatio != null && info.pegRatio! > 0 ? fmtN(info.pegRatio) : '—'),
+            ('EPS',           info.eps != null ? '\$${fmtN(info.eps)}' : '—'),
+            ('P/B Ratio',     info.priceToBook != null && info.priceToBook! > 0 ? fmtN(info.priceToBook) : '—'),
+          ].where((r) => r.$2 != '—').toList()),
+
+          // Trading
+          _SubHeader('Trading'),
+          _RowList(rows: [
+            ('Prev. Close',   fmtStockPrice(stock.prevClose)),
+            ('52W High',      info.week52High != null ? fmtStockPrice(info.week52High!) : '—'),
+            ('52W Low',       info.week52Low  != null ? fmtStockPrice(info.week52Low!)  : '—'),
+            ('Avg Vol 3M',    fmtVol(info.avgVolume3m)),
+            ('Avg Vol 10D',   fmtVol(info.avgVolume10d)),
+            ('Beta',          fmtN(info.beta)),
+            ('Analyst Target',info.targetMeanPrice != null ? fmtStockPrice(info.targetMeanPrice!) : '—'),
+          ].where((r) => r.$2 != '—').toList()),
+
+          // Dividends
+          if ((info.dividendYield ?? 0) > 0) ...[
+            _SubHeader('Dividendos'),
+            _RowList(rows: [
+              ('Dividend Yield',  fmtPct(info.dividendYield)),
+              ('Dividendo Anual', info.dividendRate != null ? '\$${fmtN(info.dividendRate)}' : '—'),
+              ('Ex-Dividend',     info.exDividendDate ?? '—'),
+              ('Payout Ratio',    info.payoutRatio != null ? '${(info.payoutRatio! * 100).toStringAsFixed(1)}%' : '—'),
+            ].where((r) => r.$2 != '—').toList()),
+          ],
+
+          // Profitability
+          if (info.profitMargin != null || info.roe != null) ...[
+            _SubHeader('Rentabilidade'),
+            _RowList(rows: [
+              ('Net Margin',      info.profitMargin   != null ? '${(info.profitMargin! * 100).toStringAsFixed(1)}%' : '—'),
+              ('Op. Margin',      info.operatingMargin != null ? '${(info.operatingMargin! * 100).toStringAsFixed(1)}%' : '—'),
+              ('ROE',             info.roe != null ? '${(info.roe! * 100).toStringAsFixed(1)}%' : '—'),
+              ('ROA',             info.roa != null ? '${(info.roa! * 100).toStringAsFixed(1)}%' : '—'),
+              ('Rev. Growth',     info.revenueGrowth  != null ? '${(info.revenueGrowth! * 100).toStringAsFixed(1)}%' : '—'),
+              ('EPS Growth',      info.earningsGrowth != null ? '${(info.earningsGrowth! * 100).toStringAsFixed(1)}%' : '—'),
+            ].where((r) => r.$2 != '—').toList()),
+          ],
+
+          // Balance Sheet
+          if (info.totalRevenue != null || info.freeCashflow != null) ...[
+            _SubHeader('Balance Sheet'),
+            _RowList(rows: [
+              ('Total Revenue',  fmtBigUsd(info.totalRevenue)),
+              ('Total Debt',     fmtBigUsd(info.totalDebt)),
+              ('Debt/Equity',    info.debtToEquity   != null ? fmtN(info.debtToEquity, d: 2) : '—'),
+              ('Current Ratio',  info.currentRatio    != null ? fmtN(info.currentRatio,  d: 2) : '—'),
+              ('Free Cash Flow', fmtBigUsd(info.freeCashflow)),
+            ].where((r) => r.$2 != '—' && r.$2 != '\$—').toList()),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SubHeader extends StatelessWidget {
+  final String title;
+  const _SubHeader(this.title);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    color: context.colors.surfaceAlt.withValues(alpha: 0.5),
+    child: Text(title,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+            color: context.colors.textMuted, letterSpacing: 0.5)),
+  );
+}
+
+// ── Dividends Card ────────────────────────────────────────────────────────────
+
+class _DividendsCard extends StatelessWidget {
+  final List<DividendPayment> dividends;
+  final StockInfo? info;
+  const _DividendsCard({required this.dividends, this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    final recent = dividends.take(8).toList();
+    final lastPay = dividends.isNotEmpty ? dividends.first.amount : null;
+
+    return _Section(
+      title: 'Dividendos',
+      child: Column(
+        children: [
+          if (info?.dividendYield != null || lastPay != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  if (info?.dividendYield != null)
+                    _DivChip('Yield',
+                        '${(info!.dividendYield! * 100).toStringAsFixed(2)}%'),
+                  if (lastPay != null) ...[
+                    SizedBox(width: 10),
+                    _DivChip('Last pay.', '\$${lastPay.toStringAsFixed(4)}'),
+                  ],
+                  if (info?.dividendRate != null) ...[
+                    SizedBox(width: 10),
+                    _DivChip('Anual', '\$${info!.dividendRate!.toStringAsFixed(2)}'),
+                  ],
+                ],
+              ),
+            ),
+          ...recent.asMap().entries.map((e) {
+            final isLast = e.key == recent.length - 1;
+            final d = e.value;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                border: isLast ? null : Border(
+                    bottom: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Text(d.date,
+                      style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
+                  const Spacer(),
+                  Text('\$${d.amount.toStringAsFixed(4)}',
+                      style: TextStyle(fontSize: 13,
+                          fontWeight: FontWeight.w600, color: AppColors.emerald)),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _DivChip extends StatelessWidget {
+  final String label, value;
+  const _DivChip(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: context.colors.background,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: context.colors.surfaceAlt),
+    ),
+    child: Column(
+      children: [
+        Text(label, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+        SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                color: AppColors.emerald)),
+      ],
+    ),
+  );
+}
+
+// ── Buy & Hold Checklist ──────────────────────────────────────────────────────
+
+class _BuyHoldChecklist extends StatelessWidget {
+  final StockInfo info;
+  final double price;
+  final List<DividendPayment> dividends;
+  const _BuyHoldChecklist({required this.info, required this.price, required this.dividends});
+
+  @override
+  Widget build(BuildContext context) {
+    // Dividend history years
+    final divYears = dividends.isNotEmpty
+        ? DateTime.now().year -
+          DateTime.tryParse(dividends.last.date)!.year
+        : 0;
+    final paysDivs = dividends.isNotEmpty;
+
+    // Liquidity
+    final liquidity = info.avgVolume3m != null && price > 0
+        ? info.avgVolume3m! * price : null;
+    String? liquidityVal;
+    if (liquidity != null) {
+      liquidityVal = liquidity >= 1e9
+          ? '\$${(liquidity / 1e9).toStringAsFixed(1)}B/d'
+          : '\$${(liquidity / 1e6).toStringAsFixed(0)}M/d';
     }
 
-    final rows = <(String, String)>[
-      ('Previous Close', fmtStockPrice(stock.prevClose)),
-      if (info.pe != null && info.pe! > 0)    ('P/E Ratio', fmtN(info.pe)),
-      if (info.forwardPE != null && info.forwardPE! > 0) ('Forward P/E', fmtN(info.forwardPE)),
-      if (info.eps != null)                   ('EPS', '\$${fmtN(info.eps)}'),
-      if (info.marketCap != null)             ('Market Cap', fmtBig(info.marketCap)),
-      if (info.dividendYield != null && info.dividendYield! > 0)
-        ('Dividend Yield', '${(info.dividendYield! * 100).toStringAsFixed(2)}%'),
-      if (info.beta != null)                  ('Beta', fmtN(info.beta, d: 2)),
-      if (info.week52High != null)            ('52W High', '\$${fmtN(info.week52High)}'),
-      if (info.week52Low != null)             ('52W Low',  '\$${fmtN(info.week52Low)}'),
-      if (info.avgVolume10d != null)          ('Avg Volume (10d)', fmtVol(info.avgVolume10d)),
-      if (info.targetMeanPrice != null)       ('Analyst Target', '\$${fmtN(info.targetMeanPrice)}'),
-      if (info.sector != null)                ('Sector',   info.sector!),
-      if (info.industry != null)              ('Industry', info.industry!),
+    final items = <(String, String, bool?, String?)>[
+      // (label, detail, pass?, value)
+      ('Pays dividends',            'Dividend history found',
+          paysDivs ? true : false,
+          paysDivs ? '${divYears}Y hist.' : null),
+      ('Consistent dividend (5Y+)', 'Uninterrupted payments for ≥ 5 years',
+          paysDivs ? (divYears >= 5 ? true : false) : null,
+          divYears > 0 ? '$divYears yrs' : null),
+      ('ROE > 10%',                 'Return on equity — efficient use of capital',
+          info.roe != null ? (info.roe! * 100) > 10 : null,
+          info.roe != null ? '${(info.roe! * 100).toStringAsFixed(1)}%' : null),
+      ('Positive net margin',       'Company earns more than it spends',
+          info.profitMargin != null ? info.profitMargin! > 0 : null,
+          info.profitMargin != null ? '${(info.profitMargin! * 100).toStringAsFixed(1)}%' : null),
+      ('Revenue growth',            'Annual revenue growing vs. prior year',
+          info.revenueGrowth != null ? info.revenueGrowth! > 0 : null,
+          info.revenueGrowth != null
+              ? '${info.revenueGrowth! >= 0 ? '+' : ''}${(info.revenueGrowth! * 100).toStringAsFixed(1)}%'
+              : null),
+      ('Earnings growth',           'Annual earnings growing vs. prior year',
+          info.earningsGrowth != null ? info.earningsGrowth! > 0 : null,
+          info.earningsGrowth != null
+              ? '${info.earningsGrowth! >= 0 ? '+' : ''}${(info.earningsGrowth! * 100).toStringAsFixed(1)}%'
+              : null),
+      ('Debt/Equity < 2×',          'Low leverage reduces financial risk',
+          info.debtToEquity != null ? info.debtToEquity! < 2 : null,
+          info.debtToEquity != null ? '${info.debtToEquity!.toStringAsFixed(2)}×' : null),
+      ('Current ratio > 1',         'Short-term assets cover liabilities',
+          info.currentRatio != null ? info.currentRatio! > 1 : null,
+          info.currentRatio != null ? '${info.currentRatio!.toStringAsFixed(2)}×' : null),
+      ('Daily volume > \$5M',       'High liquidity ensures easy entry and exit',
+          liquidity != null ? liquidity > 5e6 : null,
+          liquidityVal),
+      ('Dividend yield > 0%',       'Returns income to shareholders',
+          info.dividendYield != null ? info.dividendYield! > 0 : null,
+          info.dividendYield != null ? '${(info.dividendYield! * 100).toStringAsFixed(2)}%' : null),
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-          child: Row(
-            children: [
-              const Text('Key Statistics',
-                style: TextStyle(fontSize: 16,
-                  fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              if (consensus != null) ...[
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: consensusColor!.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+    final passed = items.where((i) => i.$3 == true).length;
+    final applicable = items.where((i) => i.$3 != null).length;
+    final total = items.length;
+    final pct = applicable > 0 ? passed / applicable : 0.0;
+    final scoreColor = pct >= 0.7 ? AppColors.emerald
+        : pct >= 0.4 ? const Color(0xFFF59E0B)
+        : AppColors.red;
+
+    return _Section(
+      title: 'Buy & Hold Checklist',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header: score + progress bar
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$passed/$total',
+                        style: TextStyle(fontSize: 26,
+                            fontWeight: FontWeight.w800, color: scoreColor)),
+                    Text('${(pct * 100).toStringAsFixed(0)}% score',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w600, color: scoreColor)),
+                  ],
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 6,
+                      backgroundColor: context.colors.surfaceAlt,
+                      valueColor: AlwaysStoppedAnimation(scoreColor),
+                    ),
                   ),
-                  child: Text(consensus,
-                    style: TextStyle(fontSize: 12,
-                      color: consensusColor, fontWeight: FontWeight.w700)),
                 ),
               ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.surfaceAlt),
-          ),
-          child: Column(
-            children: rows.asMap().entries.map((entry) {
-              final isLast = entry.key == rows.length - 1;
-              final label  = entry.value.$1;
-              final value  = entry.value.$2;
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                decoration: BoxDecoration(
-                  border: isLast ? null : const Border(
-                    bottom: BorderSide(color: AppColors.surfaceAlt)),
-                ),
+            ),
+            SizedBox(height: 16),
+            ...items.map((item) {
+              final pass = item.$3;
+              final value = item.$4;
+              final color = pass == null ? context.colors.textMuted
+                  : pass ? AppColors.emerald : AppColors.red;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-                    const Spacer(),
-                    Flexible(
-                      child: Text(value,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(fontSize: 13,
-                          fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    Icon(
+                      pass == null ? Icons.remove_circle_outline_rounded
+                          : pass ? Icons.check_circle_rounded
+                          : Icons.cancel_rounded,
+                      size: 17, color: color,
                     ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.$1,
+                              style: TextStyle(fontSize: 13,
+                                  color: pass == null
+                                      ? context.colors.textMuted
+                                      : context.colors.textPrimary)),
+                          Text(item.$2,
+                              style: TextStyle(
+                                  fontSize: 11, color: context.colors.textMuted)),
+                        ],
+                      ),
+                    ),
+                    if (value != null) ...[
+                      SizedBox(width: 8),
+                      Text(value,
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600,
+                              color: color, fontFamily: 'monospace')),
+                    ],
                   ],
                 ),
               );
-            }).toList(),
-          ),
+            }),
+          ],
         ),
-      ],
+      ),
     );
+  }
+}
+
+// ── Fair Value ────────────────────────────────────────────────────────────────
+
+class _FairValueCard extends StatelessWidget {
+  final StockInfo info;
+  const _FairValueCard({required this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    final eps  = info.eps;
+    final bv   = info.bookValue;
+    if (eps == null || eps <= 0 || bv == null || bv <= 0) return const SizedBox.shrink();
+
+    final graham = math.sqrt(22.5 * eps * bv);
+
+    return _Section(
+      title: 'Fair Value',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.colors.background,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: context.colors.surfaceAlt),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Graham Number',
+                            style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+                        SizedBox(height: 6),
+                        Text(fmtStockPrice(graham),
+                            style: TextStyle(fontSize: 17,
+                                fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+                        SizedBox(height: 4),
+                        Text('√(22.5 × EPS × Book Value)',
+                            style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Simplified estimate based on Benjamin Graham\'s formula. Not an investment recommendation.',
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted, height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Company Info ──────────────────────────────────────────────────────────────
+
+class _CompanyInfo extends StatelessWidget {
+  final StockInfo info;
+  final String sym;
+  const _CompanyInfo({required this.info, required this.sym});
+
+  @override
+  Widget build(BuildContext context) {
+    final location = [info.city, info.country].whereType<String>().join(', ');
+    final rows = <(String, String, bool)>[
+      if (info.sector   != null) ('Sector',      info.sector!,   false),
+      if (info.industry != null) ('Industry',    info.industry!, false),
+      if (location.isNotEmpty)   ('Location',    location,       false),
+      if (info.employees != null)
+        ('Employees', _fmtEmployees(info.employees!), false),
+      if (info.website  != null) ('Website',     info.website!,  true),
+    ];
+
+    return _Section(
+      title: 'Company Info',
+      child: Column(
+        children: rows.asMap().entries.map((e) {
+          final isLast = e.key == rows.length - 1;
+          final label  = e.value.$1;
+          final value  = e.value.$2;
+          final isLink = e.value.$3;
+          return InkWell(
+            onTap: isLink
+                ? () => launchUrl(Uri.parse(value),
+                    mode: LaunchMode.externalApplication)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              decoration: BoxDecoration(
+                border: isLast ? null : Border(
+                    bottom: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Text(label,
+                      style: TextStyle(fontSize: 13,
+                          color: context.colors.textMuted)),
+                  const Spacer(),
+                  Flexible(
+                    child: Text(value,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isLink ? AppColors.emerald : context.colors.textPrimary,
+                        )),
+                  ),
+                  if (isLink) ...[
+                    SizedBox(width: 4),
+                    Icon(Icons.open_in_new, size: 14, color: AppColors.emerald),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  String _fmtEmployees(int v) {
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(0)}K';
+    return '$v';
   }
 }
 
@@ -381,31 +998,31 @@ class _AboutState extends State<_About> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('About',
-            style: TextStyle(fontSize: 16,
-              fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          const SizedBox(height: 8),
-          Text(widget.text,
-            maxLines: _expanded ? null : 4,
-            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13,
-              color: AppColors.textSecond, height: 1.6)),
-          TextButton(
-            onPressed: () => setState(() => _expanded = !_expanded),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(0, 32),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return _Section(
+      title: 'Sobre',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 4),
+            Text(widget.text,
+                maxLines: _expanded ? null : 4,
+                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13,
+                    color: context.colors.textSecond, height: 1.6)),
+            TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(_expanded ? 'Show less' : 'Read more',
+                  style: TextStyle(color: AppColors.emerald, fontSize: 13)),
             ),
-            child: Text(_expanded ? 'Show less' : 'Read more',
-              style: const TextStyle(color: AppColors.emerald, fontSize: 13)),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -417,122 +1034,620 @@ class _RelatedArticles extends ConsumerWidget {
   final String sym;
   const _RelatedArticles({required this.sym});
 
+  static const _catColors = {
+    'Markets':    Color(0xFF6366F1),
+    'Stocks':     Color(0xFF10B981),
+    'Investing':  Color(0xFFF59E0B),
+    'Economics':  Color(0xFFEF4444),
+    'Crypto':     Color(0xFFF97316),
+    'Technology': Color(0xFF3B82F6),
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(relatedPostsProvider(sym));
-
     return async.when(
-      loading: () => const SizedBox.shrink(),
+      loading: () => _Section(
+        title: 'Artigos Relacionados',
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator(
+              color: AppColors.emerald, strokeWidth: 2)),
+        ),
+      ),
       error: (_, __) => const SizedBox.shrink(),
       data: (posts) {
         if (posts.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-              child: Text(
-                'Related Articles',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-            ...posts.map((post) => _RelatedPostTile(post: post)),
-          ],
+        return _Section(
+          title: 'Artigos Relacionados',
+          child: Column(
+            children: [
+              // Destaque: primeiro post com excerpt
+              _ArticleFeatured(post: posts.first, catColors: _catColors),
+              // Demais posts como lista simples
+              ...posts.skip(1).map(
+                (p) => _ArticleTile(post: p, catColors: _catColors)),
+            ],
+          ),
         );
       },
     );
   }
 }
 
-const _categoryColors = {
-  'Markets':    Color(0xFF6366F1),
-  'Stocks':     Color(0xFF10B981),
-  'Investing':  Color(0xFFF59E0B),
-  'Economics':  Color(0xFFEF4444),
-  'Crypto':     Color(0xFFF97316),
-  'Technology': Color(0xFF3B82F6),
-};
-
-class _RelatedPostTile extends StatelessWidget {
+class _ArticleFeatured extends StatelessWidget {
   final BlogPost post;
-  const _RelatedPostTile({required this.post});
+  final Map<String, Color> catColors;
+  const _ArticleFeatured({required this.post, required this.catColors});
 
   @override
   Widget build(BuildContext context) {
-    final catColor = _categoryColors[post.category] ?? AppColors.emerald;
-
+    final color = catColors[post.category] ?? AppColors.emerald;
     return InkWell(
-      onTap: () => showBlogPostSheet(context, post),
+      onTap: () => context.push('/blog/${post.slug}', extra: post),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (post.imageUrl != null)
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 child: Image.network(
                   post.imageUrl!,
-                  width: 72, height: 72,
+                  width: double.infinity, height: 150,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _placeholder(catColor),
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
-              )
-            else
-              _placeholder(catColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: catColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      post.category,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: catColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    post.title,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
               ),
-            ),
+            if (post.imageUrl != null) SizedBox(height: 12),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(5)),
+                child: Text(post.category,
+                    style: TextStyle(fontSize: 10, color: color,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ]),
+            SizedBox(height: 8),
+            Text(post.title,
+                maxLines: 3, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                    color: context.colors.textPrimary, height: 1.35)),
+            if (post.excerpt != null && post.excerpt!.isNotEmpty) ...[
+              SizedBox(height: 6),
+              Text(post.excerpt!,
+                  maxLines: 4, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: context.colors.textMuted,
+                      height: 1.5)),
+            ],
+            SizedBox(height: 10),
+            Row(children: [
+              Text('Read full article',
+                  style: TextStyle(fontSize: 12, color: AppColors.emerald,
+                      fontWeight: FontWeight.w600)),
+              SizedBox(width: 4),
+              Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.emerald),
+            ]),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _placeholder(Color color) => Container(
-    width: 72, height: 72,
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Icon(Icons.article_rounded,
-        color: color.withValues(alpha: 0.4), size: 28),
+class _ArticleTile extends StatelessWidget {
+  final BlogPost post;
+  final Map<String, Color> catColors;
+  const _ArticleTile({required this.post, required this.catColors});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = catColors[post.category] ?? AppColors.emerald;
+    return InkWell(
+      onTap: () => context.push('/blog/${post.slug}', extra: post),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(5)),
+                    child: Text(post.category,
+                        style: TextStyle(fontSize: 10, color: color,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                  SizedBox(height: 6),
+                  Text(post.title,
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.textPrimary)),
+                ],
+              ),
+            ),
+            SizedBox(width: 12),
+            Icon(Icons.chevron_right_rounded,
+                size: 18, color: context.colors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared UI ─────────────────────────────────────────────────────────────────
+
+class _Section extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _Section({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+        child: Text(title,
+            style: TextStyle(fontSize: 15,
+                fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+      ),
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.colors.surfaceAlt),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: child,
+        ),
+      ),
+    ],
   );
+}
+
+// ── AI Insight ────────────────────────────────────────────────────────────────
+
+class _AIInsightCard extends ConsumerWidget {
+  final String sym;
+  const _AIInsightCard({required this.sym});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(stockAIInsightProvider(sym));
+
+    return _Section(
+      title: 'AI Insight',
+      child: async.when(
+        loading: () => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.auto_awesome_rounded, size: 16, color: const Color(0xFF8B5CF6)),
+                SizedBox(width: 6),
+                Text('Powered by Claude',
+                    style: TextStyle(fontSize: 11, color: const Color(0xFF8B5CF6),
+                        fontWeight: FontWeight.w600)),
+              ]),
+              SizedBox(height: 12),
+              _shimmer(context, 80, double.infinity),
+              SizedBox(height: 8),
+              _shimmer(context, 60, 220),
+              SizedBox(height: 8),
+              _shimmer(context, 60, 180),
+            ],
+          ),
+        ),
+        error: (_, __) => const SizedBox.shrink(),
+        data: (insight) {
+          final cfg = _verdictCfg(insight.verdict);
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(children: [
+                  Icon(Icons.auto_awesome_rounded, size: 16, color: const Color(0xFF8B5CF6)),
+                  SizedBox(width: 6),
+                  Text('Powered by Claude',
+                      style: TextStyle(fontSize: 11, color: const Color(0xFF8B5CF6),
+                          fontWeight: FontWeight.w600)),
+                ]),
+                SizedBox(height: 14),
+                // Verdict badge + confidence
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: cfg.$1.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: cfg.$1.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(cfg.$2, size: 16, color: cfg.$1),
+                      SizedBox(width: 6),
+                      Text(insight.verdict,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                              color: cfg.$1, letterSpacing: 0.5)),
+                    ]),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Confidence: ',
+                      style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
+                  Text(insight.confidence,
+                      style: TextStyle(fontSize: 12, color: context.colors.textSecond,
+                          fontWeight: FontWeight.w600)),
+                ]),
+                SizedBox(height: 14),
+                // Summary
+                Text(insight.summary,
+                    style: TextStyle(fontSize: 13, color: context.colors.textSecond,
+                        height: 1.55)),
+                if (insight.bull != null || insight.bear != null) ...[
+                  SizedBox(height: 14),
+                  Row(children: [
+                    if (insight.bull != null)
+                      Expanded(child: _CaseCard(
+                        label: 'Bull Case', text: insight.bull!,
+                        color: AppColors.emerald,
+                      )),
+                    if (insight.bull != null && insight.bear != null)
+                      SizedBox(width: 10),
+                    if (insight.bear != null)
+                      Expanded(child: _CaseCard(
+                        label: 'Bear Case', text: insight.bear!,
+                        color: AppColors.red,
+                      )),
+                  ]),
+                ],
+                SizedBox(height: 12),
+                Text('AI-generated analysis for informational purposes only. Not financial advice.',
+                    style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _shimmer(BuildContext context, double h, double w) => Container(
+    height: h, width: w,
+    decoration: BoxDecoration(
+      color: context.colors.surfaceAlt,
+      borderRadius: BorderRadius.circular(6),
+    ),
+  );
+
+  // (color, icon)
+  (Color, IconData) _verdictCfg(String v) => switch (v) {
+    'BUY'  => (AppColors.emerald, Icons.trending_up_rounded),
+    'SELL' => (AppColors.red,     Icons.trending_down_rounded),
+    _      => (const Color(0xFFF59E0B), Icons.remove_rounded),
+  };
+}
+
+class _CaseCard extends StatelessWidget {
+  final String label, text;
+  final Color color;
+  const _CaseCard({required this.label, required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                  color: color, letterSpacing: 0.8)),
+          SizedBox(height: 5),
+          Text(text, style: TextStyle(fontSize: 11, color: context.colors.textSecond,
+              height: 1.45)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Investment Simulator ──────────────────────────────────────────────────────
+
+class _InvestmentSimulator extends ConsumerStatefulWidget {
+  final String sym;
+  final List<DividendPayment> dividends;
+  const _InvestmentSimulator({required this.sym, required this.dividends});
+
+  @override
+  ConsumerState<_InvestmentSimulator> createState() => _InvestmentSimulatorState();
+}
+
+class _InvestmentSimulatorState extends ConsumerState<_InvestmentSimulator> {
+  final _ctrl = TextEditingController(text: '1000');
+  String _period = '1A';
+
+  static const _periods = [
+    ('7D', 7), ('1M', 30), ('6M', 182), ('YTD', -1),
+    ('1A', 365), ('2A', 730), ('5A', 1825), ('10A', 3650),
+  ];
+
+  int get _days {
+    if (_period == 'YTD') {
+      final now = DateTime.now();
+      return now.difference(DateTime(now.year)).inDays;
+    }
+    return _periods.firstWhere((p) => p.$1 == _period).$2;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  ({double? priceOnly, double? withDiv}) _calc(List<HistoryBar> bars) {
+    final amount = double.tryParse(_ctrl.text) ?? 1000;
+    if (amount <= 0 || bars.isEmpty) return (priceOnly: null, withDiv: null);
+
+    final cutoff = DateTime.now().subtract(Duration(days: _days));
+    final slice  = bars.where((b) {
+      final d = DateTime.tryParse(b.date);
+      return d != null && d.isAfter(cutoff);
+    }).toList();
+
+    if (slice.isEmpty) return (priceOnly: null, withDiv: null);
+    final startPrice = slice.first.close;
+    final endPrice   = slice.last.close;
+    if (startPrice <= 0) return (priceOnly: null, withDiv: null);
+
+    final shares     = amount / startPrice;
+    final priceOnly  = shares * endPrice;
+
+    // Dividend reinvestment
+    double totalShares = shares;
+    final cutoffDate = cutoff;
+    for (final d in widget.dividends) {
+      final dt = DateTime.tryParse(d.date);
+      if (dt == null || dt.isBefore(cutoffDate)) continue;
+      // Find closest bar price on/after ex-date
+      final bar = bars.firstWhere(
+        (b) {
+          final bd = DateTime.tryParse(b.date);
+          return bd != null && !bd.isBefore(dt);
+        },
+        orElse: () => slice.last,
+      );
+      if (bar.close > 0) {
+        totalShares += (totalShares * d.amount) / bar.close;
+      }
+    }
+    final withDiv = totalShares * endPrice;
+
+    return (priceOnly: priceOnly, withDiv: withDiv);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(stockLongHistoryProvider(widget.sym));
+
+    return _Section(
+      title: 'If You Had Invested…',
+      child: Column(
+        children: [
+          // Amount input
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(children: [
+              Text('Amount invested',
+                  style: TextStyle(fontSize: 12, color: context.colors.textMuted,
+                      fontWeight: FontWeight.w600)),
+              Spacer(),
+              Container(
+                width: 130,
+                decoration: BoxDecoration(
+                  color: context.colors.background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: context.colors.border),
+                ),
+                child: Row(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('\$', style: TextStyle(color: context.colors.textMuted,
+                        fontWeight: FontWeight.w600)),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _ctrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                          color: context.colors.textPrimary),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none, isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ]),
+              ),
+            ]),
+          ),
+          // Period chips
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Wrap(
+              spacing: 6, runSpacing: 6,
+              children: _periods.map((p) {
+                final active = _period == p.$1;
+                return GestureDetector(
+                  onTap: () => setState(() => _period = p.$1),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.emerald : context.colors.background,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: active ? AppColors.emerald : context.colors.border),
+                    ),
+                    child: Text(p.$1,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                            color: active ? Colors.white : context.colors.textMuted)),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          // Results
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: async.when(
+              loading: () => Row(children: [
+                Expanded(child: _SimCard(label: 'Price', value: null, pct: null)),
+                SizedBox(width: 10),
+                Expanded(child: _SimCard(label: '+ Dividendos', value: null, pct: null)),
+              ]),
+              error: (_, __) => Text('Historical data unavailable',
+                  style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
+              data: (bars) {
+                final result = _calc(bars);
+                final amount = double.tryParse(_ctrl.text) ?? 1000;
+                final pctPrice = result.priceOnly != null
+                    ? ((result.priceOnly! - amount) / amount) * 100 : null;
+                final pctDiv = result.withDiv != null
+                    ? ((result.withDiv! - amount) / amount) * 100 : null;
+                return Row(children: [
+                  Expanded(child: _SimCard(
+                      label: 'Price',
+                      value: result.priceOnly,
+                      pct: pctPrice)),
+                  SizedBox(width: 10),
+                  Expanded(child: _SimCard(
+                      label: '+ Dividendos',
+                      value: result.withDiv,
+                      pct: pctDiv,
+                      highlight: result.withDiv != null)),
+                ]);
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              '* Reinvestment calculated at the ex-dividend date price. For informational purposes only.',
+              style: TextStyle(fontSize: 10, color: context.colors.textMuted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SimCard extends StatelessWidget {
+  final String label;
+  final double? value;
+  final double? pct;
+  final bool highlight;
+  const _SimCard({required this.label, required this.value, required this.pct,
+      this.highlight = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = pct == null ? context.colors.textPrimary
+        : pct! >= 0 ? AppColors.emerald : AppColors.red;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: highlight
+            ? AppColors.emerald.withValues(alpha: 0.06)
+            : context.colors.background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: highlight
+              ? AppColors.emerald.withValues(alpha: 0.3)
+              : context.colors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                  color: context.colors.textMuted, letterSpacing: 0.5)),
+          SizedBox(height: 8),
+          value == null
+              ? Container(height: 22, width: 80,
+                  decoration: BoxDecoration(color: context.colors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(4)))
+              : Text('\$${value!.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+                      color: context.colors.textPrimary)),
+          if (pct != null) ...[
+            SizedBox(height: 4),
+            Text('${pct! >= 0 ? '+' : ''}${pct!.toStringAsFixed(2)}%',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RowList extends StatelessWidget {
+  final List<(String, String)> rows;
+  const _RowList({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: rows.asMap().entries.map((e) {
+        final isLast = e.key == rows.length - 1;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: BoxDecoration(
+            border: isLast ? null : Border(
+                bottom: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
+          ),
+          child: Row(
+            children: [
+              Text(e.value.$1,
+                  style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
+              const Spacer(),
+              Flexible(
+                child: Text(e.value.$2,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 13,
+                        fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
 }

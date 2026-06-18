@@ -10,9 +10,10 @@ import '../../core/providers/blog_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/models/crypto_model.dart';
 import '../../core/models/blog_post_model.dart';
-import '../../core/widgets/blog_post_sheet.dart';
+
 import '../../core/utils/formatters.dart';
 import 'widgets/index_card.dart';
+import '../../core/shell/main_shell.dart';
 
 // Inline providers for calendar (reuse from finance page logic)
 import '../../core/api/api_client.dart';
@@ -67,30 +68,30 @@ class _HomePageState extends ConsumerState<HomePage> {
                 controller: _searchCtrl,
                 focusNode: _focusNode,
                 autofocus: true,
-                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
-                decoration: const InputDecoration(
+                style: TextStyle(color: context.colors.textPrimary, fontSize: 16),
+                decoration: InputDecoration(
                   hintText: 'Search stocks and crypto…',
-                  hintStyle: TextStyle(color: AppColors.textMuted),
+                  hintStyle: TextStyle(color: context.colors.textMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                 ),
                 onChanged: (v) => ref.read(_stockQueryProvider.notifier).state = v.trim(),
               )
-            : const Text('Markets'),
+            : Text('Markets'),
         leading: _searching
-            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _clearSearch)
+            ? IconButton(icon: Icon(Icons.arrow_back), onPressed: _clearSearch)
             : null,
         actions: [
           if (_searching && query.isNotEmpty)
-            IconButton(icon: const Icon(Icons.close), onPressed: _clearSearch)
+            IconButton(icon: Icon(Icons.close), onPressed: _clearSearch)
           else if (!_searching) ...[
             IconButton(
-              icon: const Icon(Icons.search_rounded),
+              icon: Icon(Icons.search_rounded),
               onPressed: () => setState(() => _searching = true),
             ),
             IconButton(
-              icon: const Icon(Icons.refresh_rounded),
+              icon: Icon(Icons.refresh_rounded),
               onPressed: () {
                 ref.invalidate(marketOverviewProvider);
                 ref.invalidate(screenerProvider);
@@ -100,6 +101,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ref.invalidate(_calDividendsProvider);
               },
             ),
+            MainShellMenu.themeButton(),
+            MainShellMenu.button(),
           ],
         ],
       ),
@@ -121,11 +124,11 @@ class _SearchResults extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (query.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.search_rounded, size: 48, color: AppColors.surfaceAlt),
+          Icon(Icons.search_rounded, size: 48, color: context.colors.surfaceAlt),
           SizedBox(height: 12),
-          Text('Search stocks and crypto', style: TextStyle(color: AppColors.textMuted)),
+          Text('Search stocks and crypto', style: TextStyle(color: context.colors.textMuted)),
         ]),
       );
     }
@@ -152,7 +155,7 @@ class _SearchResults extends StatelessWidget {
 
     if (items.isEmpty) {
       return Center(child: Text('No results for "$query"',
-          style: const TextStyle(color: AppColors.textMuted)));
+          style: TextStyle(color: context.colors.textMuted)));
     }
     items.sort((a, b) => b.score.compareTo(a.score));
 
@@ -177,14 +180,14 @@ class _StockTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(children: [
           _Logo(symbol: stock.symbol, size: 40, radius: 10),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(stock.symbol, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            Text(stock.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            Text(stock.symbol, style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            Text(stock.name, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(fmtStockPrice(stock.price), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            const SizedBox(height: 2),
+            Text(fmtStockPrice(stock.price), style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            SizedBox(height: 2),
             _ChangeBadge(value: stock.changePct, color: color),
           ]),
         ]),
@@ -210,19 +213,19 @@ class _CryptoTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             child: Image.network(coin.image, width: 40, height: 40,
               errorBuilder: (context, error, stackTrace) => Container(
-                width: 40, height: 40, color: AppColors.surfaceAlt,
+                width: 40, height: 40, color: context.colors.surfaceAlt,
                 child: Center(child: Text(coin.symbol.toUpperCase().substring(0, 1),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textMuted))),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: context.colors.textMuted))),
               )),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(coin.symbol.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            Text(coin.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            Text(coin.symbol.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            Text(coin.name, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${fmtPrice(coin.currentPrice)}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            const SizedBox(height: 2),
+            Text('\$${fmtPrice(coin.currentPrice)}', style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            SizedBox(height: 2),
             _ChangeBadge(value: coin.priceChangePercentage24h, color: color),
           ]),
         ]),
@@ -295,7 +298,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  separatorBuilder: (_, __) => SizedBox(width: 10),
                   itemCount: data.indices.length,
                   itemBuilder: (_, i) => IndexCard(index: data.indices[i]),
                 ),
@@ -342,7 +345,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           rankData().when(
             loading: () => _rankSkeleton(),
             error: (_, __) => const SizedBox.shrink(),
@@ -367,7 +370,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
                   async: dividendsAsync,
                   builder: (item) => _DivRow(item: item),
                 )),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(child: _CalCard(
                   title: 'Earnings',
                   icon: Icons.trending_up_rounded,
@@ -384,7 +387,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
             title: 'Crypto',
             trailing: TextButton(
               onPressed: () => context.go('/crypto'),
-              child: const Text('Ver mais', style: TextStyle(color: AppColors.emerald, fontSize: 12)),
+              child: Text('See more', style: TextStyle(color: AppColors.emerald, fontSize: 12)),
             ),
           ),
           cryptoAsync.when(
@@ -395,28 +398,32 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
             ),
           ),
 
-          // ── 6. Artigos Cripto ──────────────────────────────────────────
+          // ── 6. Artigos Recentes ────────────────────────────────────────
           _SectionHeader(
-            title: 'Crypto Articles',
-            subtitle: 'From our blog',
+            title: 'Do Nosso Blog',
+            subtitle: 'Artigos recentes',
             trailing: TextButton(
               onPressed: () => context.go('/news'),
-              child: const Text('Ver todos', style: TextStyle(color: AppColors.emerald, fontSize: 12)),
+              child: Text('Ver todos', style: TextStyle(color: AppColors.emerald, fontSize: 12)),
             ),
           ),
           blogAsync.when(
             loading: () => _blogSkeleton(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text('Erro posts: $e',
+                  style: TextStyle(fontSize: 11, color: AppColors.red)),
+            ),
             data: (posts) {
-              final crypto = posts.where((p) => p.category == 'Crypto').take(4).toList();
-              if (crypto.isEmpty) return const SizedBox.shrink();
+              final recent = posts.take(4).toList();
+              if (recent.isEmpty) return const SizedBox.shrink();
               return Column(
-                children: crypto.map((post) => _HomeBlogTile(post: post)).toList(),
+                children: recent.map((post) => _HomeBlogTile(post: post)).toList(),
               );
             },
           ),
 
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
         ],
       ),
     );
@@ -427,11 +434,11 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      separatorBuilder: (_, __) => const SizedBox(width: 10),
+      separatorBuilder: (_, __) => SizedBox(width: 10),
       itemCount: 4,
       itemBuilder: (_, __) => Container(
         width: 110, height: 92,
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(12)),
       ),
     ),
   );
@@ -444,7 +451,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
         crossAxisCount: 2, childAspectRatio: 2.6, crossAxisSpacing: 10, mainAxisSpacing: 10),
       itemCount: 10,
       itemBuilder: (_, __) => Container(
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12))),
+        decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(12))),
     ),
   );
 
@@ -452,7 +459,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
     children: List.generate(5, (_) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Container(height: 44, decoration: BoxDecoration(
-        color: AppColors.surface, borderRadius: BorderRadius.circular(10))),
+        color: context.colors.surface, borderRadius: BorderRadius.circular(10))),
     )),
   );
 
@@ -460,7 +467,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
     children: List.generate(5, (_) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(height: 44, decoration: BoxDecoration(
-        color: AppColors.surface, borderRadius: BorderRadius.circular(10))),
+        color: context.colors.surface, borderRadius: BorderRadius.circular(10))),
     )),
   );
 
@@ -469,14 +476,14 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(children: [
         Container(width: 72, height: 72, decoration: BoxDecoration(
-          color: AppColors.surface, borderRadius: BorderRadius.circular(10))),
-        const SizedBox(width: 12),
+          color: context.colors.surface, borderRadius: BorderRadius.circular(10))),
+        SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(height: 12, width: 60, color: AppColors.surface),
-          const SizedBox(height: 8),
-          Container(height: 14, color: AppColors.surface),
-          const SizedBox(height: 6),
-          Container(height: 14, width: double.infinity * 0.7, color: AppColors.surface),
+          Container(height: 12, width: 60, color: context.colors.surface),
+          SizedBox(height: 8),
+          Container(height: 14, color: context.colors.surface),
+          SizedBox(height: 6),
+          Container(height: 14, width: double.infinity * 0.7, color: context.colors.surface),
         ])),
       ]),
     )),
@@ -500,8 +507,8 @@ class _SectionHeader extends StatelessWidget {
         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-            if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+            Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+            if (subtitle != null) Text(subtitle!, style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
           ],
         )),
         if (trailing != null) trailing!,
@@ -519,14 +526,14 @@ class _Logo extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: size, height: size,
-    decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(radius)),
+    decoration: BoxDecoration(color: context.colors.surfaceAlt, borderRadius: BorderRadius.circular(radius)),
     clipBehavior: Clip.antiAlias,
     child: Image.network(
       'https://assets.parqet.com/logos/symbol/$symbol?format=png',
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) => Center(
         child: Text(symbol.length >= 2 ? symbol.substring(0, 2) : symbol,
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: size * 0.28, color: AppColors.textMuted)),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: size * 0.28, color: context.colors.textMuted)),
       ),
     ),
   );
@@ -568,9 +575,9 @@ class _HeatmapCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.surfaceAlt),
+          border: Border.all(color: context.colors.surfaceAlt),
         ),
         child: Row(children: [
           Stack(children: [
@@ -579,15 +586,15 @@ class _HeatmapCard extends StatelessWidget {
               bottom: 0, right: 0,
               child: Container(
                 width: 14, height: 14,
-                decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(4)),
-                child: Center(child: Text('$rank', style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold, color: AppColors.textMuted))),
+                decoration: BoxDecoration(color: context.colors.background, borderRadius: BorderRadius.circular(4)),
+                child: Center(child: Text('$rank', style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold, color: context.colors.textMuted))),
               ),
             ),
           ]),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(stock.symbol, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-            Text(fmtStockPrice(stock.price), style: const TextStyle(fontSize: 11, color: AppColors.textSecond)),
+            Text(stock.symbol, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+            Text(fmtStockPrice(stock.price), style: TextStyle(fontSize: 11, color: context.colors.textSecond)),
           ])),
           _ChangeBadge(value: stock.changePct, color: color),
         ]),
@@ -614,13 +621,13 @@ class _RankChip extends StatelessWidget {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? AppColors.emerald : AppColors.surface,
+          color: active ? AppColors.emerald : context.colors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: active ? AppColors.emerald : AppColors.surfaceAlt),
+          border: Border.all(color: active ? AppColors.emerald : context.colors.surfaceAlt),
         ),
         child: Text(label, style: TextStyle(
           fontSize: 12, fontWeight: FontWeight.w600,
-          color: active ? Colors.white : AppColors.textMuted,
+          color: active ? Colors.white : context.colors.textMuted,
         )),
       ),
     );
@@ -657,18 +664,18 @@ class _RankRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(children: [
-          SizedBox(width: 20, child: Text('$rank', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted), textAlign: TextAlign.center)),
-          const SizedBox(width: 10),
+          SizedBox(width: 20, child: Text('$rank', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.colors.textMuted), textAlign: TextAlign.center)),
+          SizedBox(width: 10),
           _Logo(symbol: stock.symbol, size: 36, radius: 9),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(stock.symbol, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            Text(stock.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+            Text(stock.symbol, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            Text(stock.name, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(value(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: tab == 2 ? AppColors.textPrimary : color)),
+            Text(value(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: tab == 2 ? context.colors.textPrimary : color)),
             if (tab == 2 || tab == 3)
-              Text(fmtStockPrice(stock.price), style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              Text(fmtStockPrice(stock.price), style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
           ]),
         ]),
       ),
@@ -690,29 +697,29 @@ class _CalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: AppColors.surface,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.surfaceAlt),
+      border: Border.all(color: context.colors.surfaceAlt),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
         child: Row(children: [
           Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
         ]),
       ),
-      const Divider(height: 1, color: AppColors.surfaceAlt),
+      Divider(height: 1, color: context.colors.surfaceAlt),
       async.when(
         loading: () => Padding(padding: const EdgeInsets.all(12),
           child: Column(children: List.generate(3, (_) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Container(height: 32, decoration: BoxDecoration(
-              color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(6))),
+              color: context.colors.surfaceAlt, borderRadius: BorderRadius.circular(6))),
           )))),
-        error: (_, __) => const Padding(padding: EdgeInsets.all(12),
-          child: Text('Unavailable', style: TextStyle(fontSize: 11, color: AppColors.textMuted))),
+        error: (_, __) => Padding(padding: EdgeInsets.all(12),
+          child: Text('Unavailable', style: TextStyle(fontSize: 11, color: context.colors.textMuted))),
         data: (items) => Column(
           children: items.take(4).map(builder).toList(),
         ),
@@ -739,13 +746,13 @@ class _DivRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(children: [
           _Logo(symbol: symbol, size: 28, radius: 7),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(symbol, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            if (exDate.isNotEmpty) Text(fmtDate(exDate), style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+            Text(symbol, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            if (exDate.isNotEmpty) Text(fmtDate(exDate), style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
           ])),
           if (amount > 0) Text('\$${amount.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.emerald)),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.emerald)),
         ]),
       ),
     );
@@ -772,10 +779,10 @@ class _EarningsRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(children: [
           _Logo(symbol: symbol, size: 28, radius: 7),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(symbol, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            if (date.isNotEmpty) Text(fmtDate(date), style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+            Text(symbol, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            if (date.isNotEmpty) Text(fmtDate(date), style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
           ])),
           if (timeLabel.isNotEmpty)
             Container(
@@ -808,26 +815,26 @@ class _CryptoPreviewRow extends StatelessWidget {
           SizedBox(
             width: 24,
             child: Text('#${coin.marketCapRank ?? ''}',
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(18),
             child: Image.network(coin.image, width: 36, height: 36,
               errorBuilder: (context, error, stackTrace) => Container(
-                width: 36, height: 36, color: AppColors.surfaceAlt,
+                width: 36, height: 36, color: context.colors.surfaceAlt,
                 child: Center(child: Text(coin.symbol.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMuted))),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: context.colors.textMuted))),
               )),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(coin.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            Text(coin.symbol.toUpperCase(), style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+            Text(coin.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+            Text(coin.symbol.toUpperCase(), style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${fmtPrice(coin.currentPrice)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            const SizedBox(height: 2),
+            Text('\$${fmtPrice(coin.currentPrice)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+            SizedBox(height: 2),
             _ChangeBadge(value: coin.priceChangePercentage24h, color: color),
           ]),
         ]),
@@ -857,7 +864,7 @@ class _HomeBlogTile extends StatelessWidget {
     final ago      = _blogTimeAgo(post.publishedAt);
 
     return InkWell(
-      onTap: () => showBlogPostSheet(context, post),
+      onTap: () => context.push('/blog/${post.slug}', extra: post),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -876,7 +883,7 @@ class _HomeBlogTile extends StatelessWidget {
                     )
                   : _blogPlaceholder(catColor),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,23 +898,23 @@ class _HomeBlogTile extends StatelessWidget {
                       child: Text(post.category,
                         style: TextStyle(fontSize: 10, color: catColor, fontWeight: FontWeight.w700)),
                     ),
-                    const SizedBox(width: 8),
-                    Text(ago, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                    SizedBox(width: 8),
+                    Text(ago, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
                   ]),
-                  const SizedBox(height: 5),
+                  SizedBox(height: 5),
                   Text(
                     post.title,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary, height: 1.4),
+                      color: context.colors.textPrimary, height: 1.4),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 18),
+            SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, color: context.colors.textMuted, size: 18),
           ],
         ),
       ),

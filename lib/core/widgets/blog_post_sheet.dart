@@ -37,8 +37,8 @@ class _BlogPostSheet extends StatelessWidget {
       minChildSize: 0.4,
       maxChildSize: 0.92,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
+        decoration: BoxDecoration(
+          color: context.colors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -52,7 +52,7 @@ class _BlogPostSheet extends StatelessWidget {
                   Container(
                     width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt,
+                      color: context.colors.surfaceAlt,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -62,11 +62,11 @@ class _BlogPostSheet extends StatelessWidget {
                     child: Container(
                       width: 32, height: 32,
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
+                        color: context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.close_rounded,
-                          size: 16, color: AppColors.textMuted),
+                      child: Icon(Icons.close_rounded,
+                          size: 16, color: context.colors.textMuted),
                     ),
                   ),
                 ],
@@ -92,7 +92,7 @@ class _BlogPostSheet extends StatelessWidget {
                       ),
                     ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
 
                   // Category chip + time
                   Row(
@@ -113,42 +113,42 @@ class _BlogPostSheet extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Text(
                         ago,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textMuted),
+                        style: TextStyle(
+                            fontSize: 12, color: context.colors.textMuted),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
 
                   // Title
                   Text(
                     post.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                       height: 1.35,
                     ),
                   ),
 
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
 
                   // Excerpt / summary
                   if (post.excerpt != null && post.excerpt!.isNotEmpty)
                     Text(
                       post.excerpt!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecond,
+                        color: context.colors.textSecond,
                         height: 1.65,
                       ),
                     ),
 
-                  const SizedBox(height: 28),
+                  SizedBox(height: 28),
 
                   // Leia mais button
                   SizedBox(
@@ -162,7 +162,7 @@ class _BlogPostSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Leia mais',
                         style: TextStyle(
                           fontSize: 15,
@@ -185,32 +185,32 @@ class _BlogPostSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Leia o artigo completo',
+        title: Text(
+          'Read full article',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
-          'Você será redirecionado para nossa página web.',
-          style: TextStyle(color: AppColors.textSecond, fontSize: 14),
+        content: Text(
+          'You will be redirected to our website.',
+          style: TextStyle(color: context.colors.textSecond, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: Text('Cancel',
+                style: TextStyle(color: context.colors.textMuted)),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               launchUrl(url, mode: LaunchMode.externalApplication);
             },
-            child: const Text('Continuar',
+            child: Text('Continue',
                 style: TextStyle(
                     color: AppColors.emerald, fontWeight: FontWeight.w600)),
           ),

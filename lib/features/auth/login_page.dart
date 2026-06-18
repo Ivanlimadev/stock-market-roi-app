@@ -48,49 +48,49 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 48),
+              SizedBox(height: 48),
 
               // Logo
-              const Icon(Icons.bar_chart_rounded, size: 48, color: AppColors.emerald),
-              const SizedBox(height: 16),
-              const Text(
+              Icon(Icons.bar_chart_rounded, size: 48, color: AppColors.emerald),
+              SizedBox(height: 16),
+              Text(
                 'Stock Market ROI',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8),
+              Text(
                 'Sign in to your account',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: context.colors.textMuted),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // Email
               TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                style: const TextStyle(color: AppColors.textPrimary),
-                decoration: const InputDecoration(
+                style: TextStyle(color: context.colors.textPrimary),
+                decoration: InputDecoration(
                   labelText: 'Email',
-                  prefixIcon: Icon(Icons.email_outlined, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.email_outlined, color: context.colors.textMuted),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
 
               // Password
               TextField(
                 controller: _password,
                 obscureText: !_showPw,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: context.colors.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.lock_outlined, color: context.colors.textMuted),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _showPw ? Icons.visibility_off : Icons.visibility,
-                      color: AppColors.textMuted,
+                      color: context.colors.textMuted,
                     ),
                     onPressed: () => setState(() => _showPw = !_showPw),
                   ),
@@ -108,16 +108,16 @@ class _LoginPageState extends State<LoginPage> {
                     minimumSize: const Size(0, 32),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Forgot password?',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  child: Text('Forgot password?',
+                    style: TextStyle(color: context.colors.textMuted, fontSize: 13)),
                 ),
               ),
 
               if (_error != null) ...[
-                const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
+                SizedBox(height: 8),
+                Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
               ],
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
 
               // Sign in button
               FilledButton(
@@ -129,19 +129,19 @@ class _LoginPageState extends State<LoginPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: _loading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Sign In', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text('Sign In', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
 
               // Register link
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("Don't have an account?", style: TextStyle(color: AppColors.textMuted)),
+                  Text("Don't have an account?", style: TextStyle(color: context.colors.textMuted)),
                   TextButton(
                     onPressed: () => context.go('/register'),
-                    child: const Text('Create one', style: TextStyle(color: AppColors.emerald)),
+                    child: Text('Create one', style: TextStyle(color: AppColors.emerald)),
                   ),
                 ],
               ),

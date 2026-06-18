@@ -23,7 +23,7 @@ class StockRow extends StatelessWidget {
             Container(
               width: 36, height: 36,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(8),
               ),
               clipBehavior: Clip.antiAlias,
@@ -32,20 +32,20 @@ class StockRow extends StatelessWidget {
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => Center(
                   child: Text(stock.symbol.substring(0, 2),
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.colors.textMuted)),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             // Name
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(stock.symbol,
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
                   Text(stock.name,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 11, color: context.colors.textMuted),
                     overflow: TextOverflow.ellipsis),
                 ],
               ),
@@ -55,7 +55,7 @@ class StockRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('\$${stock.price.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  style: TextStyle(fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(

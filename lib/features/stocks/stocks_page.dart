@@ -16,20 +16,20 @@ class StocksPage extends ConsumerWidget {
     final stocks  = ref.watch(screenerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stocks')),
+      appBar: AppBar(title: Text('Stocks')),
       body: Column(
         children: [
           // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: TextField(
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: context.colors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Search symbol or name…',
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+                prefixIcon: Icon(Icons.search_rounded, color: context.colors.textMuted),
                 suffixIcon: query.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
+                        icon: Icon(Icons.close, color: context.colors.textMuted, size: 18),
                         onPressed: () => ref.read(_searchProvider.notifier).state = '',
                       )
                     : null,
@@ -40,9 +40,9 @@ class StocksPage extends ConsumerWidget {
 
           Expanded(
             child: stocks.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.emerald)),
+              loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
               error:   (e, _) => Center(
-                child: Text('Failed to load stocks', style: const TextStyle(color: AppColors.textMuted))),
+                child: Text('Failed to load stocks', style: TextStyle(color: context.colors.textMuted))),
               data: (all) {
                 final filtered = query.isEmpty
                     ? all
@@ -53,7 +53,7 @@ class StocksPage extends ConsumerWidget {
                 if (filtered.isEmpty) {
                   return Center(
                     child: Text('No results for "$query"',
-                      style: const TextStyle(color: AppColors.textMuted)));
+                      style: TextStyle(color: context.colors.textMuted)));
                 }
 
                 return ListView.builder(
@@ -87,27 +87,27 @@ class _StockListTile extends StatelessWidget {
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(10)),
+                color: context.colors.surfaceAlt, borderRadius: BorderRadius.circular(10)),
               clipBehavior: Clip.antiAlias,
               child: Image.network(
                 'https://assets.parqet.com/logos/symbol/${stock.symbol}?format=png',
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => Center(
                   child: Text(stock.symbol.length >= 2 ? stock.symbol.substring(0, 2) : stock.symbol,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.colors.textMuted)),
                 ),
               ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(stock.symbol,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
                   Text(stock.name,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
                 ],
               ),
             ),
@@ -115,8 +115,8 @@ class _StockListTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('\$${stock.price.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                const SizedBox(height: 2),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
+                SizedBox(height: 2),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(

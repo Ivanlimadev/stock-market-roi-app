@@ -14,21 +14,21 @@ class IndexCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.surfaceAlt),
+        border: Border.all(color: context.colors.surfaceAlt),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(index.name,
-            style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 4),
+            style: TextStyle(fontSize: 11, color: context.colors.textMuted, fontWeight: FontWeight.w500)),
+          SizedBox(height: 4),
           Text(
             index.price.toStringAsFixed(index.price >= 1000 ? 0 : 2),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Row(
             children: [
               Icon(up ? Icons.arrow_drop_up : Icons.arrow_drop_down, color: color, size: 16),
