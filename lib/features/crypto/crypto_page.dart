@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/crypto_provider.dart';
+import '../../core/providers/financials_provider.dart';
 import '../../core/models/crypto_model.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/providers/realtime_price_provider.dart';
@@ -27,6 +28,9 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
     ref.invalidate(cryptoGlobalProvider);
     ref.invalidate(cryptoTrendingProvider);
     ref.invalidate(cryptoFearGreedProvider);
+    ref.invalidate(cryptoFundingProvider);
+    ref.invalidate(cryptoLongShortProvider);
+    ref.invalidate(defiTvlProvider);
   }
 
   @override
@@ -71,6 +75,15 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
                 onTabChange: (i) => setState(() => _heatmapTab = i),
               ),
             ),
+
+            // ── Funding Rates ────────────────────────────────────────────
+            const SliverToBoxAdapter(child: _FundingSection()),
+
+            // ── Long / Short Ratio ────────────────────────────────────────
+            const SliverToBoxAdapter(child: _LongShortSection()),
+
+            // ── DeFi TVL ─────────────────────────────────────────────────
+            const SliverToBoxAdapter(child: _DefiSection()),
 
             // ── Top 100 list ─────────────────────────────────────────────
             const SliverToBoxAdapter(child: _SectionHeader('Top Cryptocurrencies')),
@@ -995,3 +1008,337 @@ class _ErrorBox extends StatelessWidget {
 
 // Uses fmtCryptoPrice from formatters.dart — keeps $ prefix stripped for inline use
 String _fmtPrice(double price) => fmtCryptoPrice(price).replaceFirst('\$', '');
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Funding Rates
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _FundingSection extends ConsumerWidget {
+  const _FundingSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(cryptoFundingProvider);
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (rates) {
+        if (rates.isEmpty) return const SizedBox.shrink();
+        final c = context.colors;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeader2('Funding Rates', 'Perpetual futures — refreshed every 5 min'),
+              SizedBox(height: 10),
+              // 2-column grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 2.3,
+                ),
+                itemCount: rates.length,
+                itemBuilder: (_, i) {
+                  final r      = rates[i];
+                  final isPos  = r.ratePct >= 0;
+                  final color  = isPos ? AppColors.emerald : AppColors.red;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: c.surfaceAlt),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(r.symbol,
+                                  style: TextStyle(fontSize: 13,
+                                      fontWeight: FontWeight.w700, color: c.textPrimary)),
+                              Text('${r.annualPct.toStringAsFixed(1)}% ann.',
+                                  style: TextStyle(fontSize: 10, color: c.textMuted)),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            '${isPos ? '+' : ''}${r.ratePct.toStringAsFixed(4)}%',
+                            style: TextStyle(fontSize: 11,
+                                fontWeight: FontWeight.w700, color: color),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Long / Short Ratio
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _LongShortSection extends ConsumerWidget {
+  const _LongShortSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(cryptoLongShortProvider);
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        final c = context.colors;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeader2('Long / Short Ratio', 'Account sentiment — perpetual contracts'),
+              SizedBox(height: 10),
+              Container(
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: c.surfaceAlt),
+                ),
+                child: Column(
+                  children: items.asMap().entries.map((e) {
+                    final isLast = e.key == items.length - 1;
+                    final item   = e.value;
+                    final longW  = item.longPct / 100;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: isLast ? null : Border(
+                          bottom: BorderSide(color: c.surfaceAlt, width: 0.5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(item.symbol,
+                                  style: TextStyle(fontSize: 13,
+                                      fontWeight: FontWeight.w700, color: c.textPrimary)),
+                              const Spacer(),
+                              Text(
+                                '${item.longPct.toStringAsFixed(1)}% L',
+                                style: TextStyle(fontSize: 11,
+                                    fontWeight: FontWeight.w600, color: AppColors.emerald),
+                              ),
+                              Text(' / ', style: TextStyle(fontSize: 11, color: c.textMuted)),
+                              Text(
+                                '${item.shortPct.toStringAsFixed(1)}% S',
+                                style: TextStyle(fontSize: 11,
+                                    fontWeight: FontWeight.w600, color: AppColors.red),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: SizedBox(
+                              height: 5,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: (longW * 1000).round(),
+                                    child: Container(color: AppColors.emerald),
+                                  ),
+                                  Expanded(
+                                    flex: ((1 - longW) * 1000).round(),
+                                    child: Container(color: AppColors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DeFi TVL
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _DefiSection extends ConsumerWidget {
+  const _DefiSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(defiTvlProvider);
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (data) {
+        final c = context.colors;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _SectionHeader2('DeFi TVL', 'Total Value Locked — top protocols'),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (data.change1d >= 0 ? AppColors.emerald : AppColors.red)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${data.change1d >= 0 ? '+' : ''}${data.change1d.toStringAsFixed(2)}% 24h',
+                      style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700,
+                        color: data.change1d >= 0 ? AppColors.emerald : AppColors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 10),
+                child: Text(
+                  'Total: ${fmtBigUsd(data.totalTvl)}',
+                  style: TextStyle(fontSize: 12, color: c.textMuted),
+                ),
+              ),
+              // Protocol list
+              Container(
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: c.surfaceAlt),
+                ),
+                child: Column(
+                  children: data.protocols.asMap().entries.map((e) {
+                    final isLast = e.key == data.protocols.length - 1;
+                    final p      = e.value;
+                    final isPos  = p.change1d >= 0;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                      decoration: BoxDecoration(
+                        border: isLast ? null : Border(
+                          bottom: BorderSide(color: c.surfaceAlt, width: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p.name,
+                                    style: TextStyle(fontSize: 13,
+                                        fontWeight: FontWeight.w600, color: c.textPrimary)),
+                                Text(p.category,
+                                    style: TextStyle(fontSize: 11, color: c.textMuted)),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(fmtBigUsd(p.tvl),
+                                  style: TextStyle(fontSize: 13,
+                                      fontWeight: FontWeight.w700, color: c.textPrimary)),
+                              Text(
+                                '${isPos ? '+' : ''}${p.change1d.toStringAsFixed(2)}%',
+                                style: TextStyle(fontSize: 11,
+                                    color: isPos ? AppColors.emerald : AppColors.red,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              SizedBox(height: 6),
+              // Chain bars
+              Text('By Chain', style: TextStyle(fontSize: 12, color: c.textMuted,
+                  fontWeight: FontWeight.w600)),
+              SizedBox(height: 6),
+              ...data.chains.map((ch) => Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  children: [
+                    SizedBox(width: 56,
+                        child: Text(ch.name, style: TextStyle(fontSize: 11, color: c.textSecond))),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: ch.share / 100,
+                          minHeight: 5,
+                          backgroundColor: c.surfaceAlt,
+                          valueColor: const AlwaysStoppedAnimation(AppColors.emerald),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 60,
+                        child: Text(fmtBigUsd(ch.tvl),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(fontSize: 10, color: c.textMuted))),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SectionHeader2 extends StatelessWidget {
+  final String title, subtitle;
+  const _SectionHeader2(this.title, this.subtitle);
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(title,
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+              color: context.colors.textPrimary)),
+      Text(subtitle,
+          style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+    ],
+  );
+}

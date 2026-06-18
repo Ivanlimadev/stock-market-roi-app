@@ -112,6 +112,14 @@ class _MainShellState extends State<MainShell> {
                       },
                     ),
                     _DrawerItem(
+                      icon: Icons.star_rounded,
+                      label: 'Watchlist',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/watchlist');
+                      },
+                    ),
+                    _DrawerItem(
                       icon: Icons.notifications_rounded,
                       label: 'Notifications',
                       badge: 'Coming soon',
@@ -128,10 +136,52 @@ class _MainShellState extends State<MainShell> {
                     const SizedBox(height: 8),
                     _DrawerSection('Tools'),
                     _DrawerItem(
+                      icon: Icons.manage_search_rounded,
+                      label: 'Stock Screener',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/screener');
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.bar_chart_rounded,
+                      label: 'Rankings',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/rankings');
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.grid_view_rounded,
+                      label: 'Market Heatmap',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/heatmap');
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.compare_arrows_rounded,
+                      label: 'Compare Stocks',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/compare');
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.auto_awesome_rounded,
+                      label: 'Editorial Rankings',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/editorial');
+                      },
+                    ),
+                    _DrawerItem(
                       icon: Icons.calculate_rounded,
                       label: 'Calculators',
-                      badge: 'Coming soon',
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/calculators');
+                      },
                     ),
                     const SizedBox(height: 8),
                     _DrawerSection('Help'),

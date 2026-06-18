@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../models/portfolio_model.dart';
 import 'realtime_price_provider.dart';
@@ -115,3 +116,46 @@ final portfolioTransactionsProvider =
       .map((e) => PortfolioTransaction.fromJson(e as Map<String, dynamic>))
       .toList();
 });
+
+// ── Portfolio history snapshots ────────────────────────────────────────────────
+
+final portfolioSnapshotsProvider =
+    FutureProvider.autoDispose<List<PortfolioSnapshot>>((ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return [];
+  final res = await Supabase.instance.client
+      .from('portfolio_snapshots')
+      .select('snapshot_date, total_value, total_invested')
+      .eq('user_id', uid)
+      .order('snapshot_date', ascending: true)
+      .limit(90);
+  return (res as List)
+      .map((e) => PortfolioSnapshot.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
+Future<void> savePortfolioSnapshotIfNeeded({
+  required double totalValue,
+  required double totalInvested,
+}) async {
+  if (totalValue <= 0) return;
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return;
+  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  final existing = await Supabase.instance.client
+      .from('portfolio_snapshots')
+      .select('id')
+      .eq('user_id', uid)
+      .eq('snapshot_date', today)
+      .maybeSingle();
+
+  if (existing != null) return;
+
+  await Supabase.instance.client.from('portfolio_snapshots').insert({
+    'user_id':        uid,
+    'snapshot_date':  today,
+    'total_value':    totalValue,
+    'total_invested': totalInvested,
+  });
+}

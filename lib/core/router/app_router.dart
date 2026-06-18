@@ -15,6 +15,19 @@ import '../../features/perfil/perfil_page.dart';
 import '../../features/blog/blog_post_page.dart';
 import '../../core/models/blog_post_model.dart';
 import '../shell/main_shell.dart';
+import '../../features/calculators/calculators_hub_page.dart';
+import '../../features/calculators/compound_interest_page.dart';
+import '../../features/calculators/simple_interest_page.dart';
+import '../../features/calculators/first_million_page.dart';
+import '../../features/calculators/percentage_page.dart';
+import '../../features/calculators/dca_page.dart';
+import '../../features/calculators/roi_page.dart';
+import '../../features/watchlist/watchlist_page.dart';
+import '../../features/screener/screener_page.dart';
+import '../../features/rankings/rankings_page.dart';
+import '../../features/heatmap/heatmap_page.dart';
+import '../../features/compare/compare_page.dart';
+import '../../features/editorial/editorial_rankings_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
@@ -37,6 +50,48 @@ final appRouter = GoRouter(
     GoRoute(path: '/login',           builder: (_, $) => const LoginPage()),
     GoRoute(path: '/register',        builder: (_, $) => const RegisterPage()),
     GoRoute(path: '/forgot-password', builder: (_, $) => const ForgotPasswordPage()),
+
+    // Watchlist — outside shell (full screen, back button)
+    GoRoute(path: '/watchlist', builder: (_, $) => const WatchlistPage()),
+
+    // Screener — outside shell
+    GoRoute(path: '/screener',  builder: (_, $) => const ScreenerPage()),
+
+    // Rankings — outside shell
+    GoRoute(path: '/rankings',  builder: (_, $) => const RankingsPage()),
+
+    // Heatmap — outside shell
+    GoRoute(path: '/heatmap',   builder: (_, $) => const HeatmapPage()),
+
+    // Compare — outside shell
+    GoRoute(path: '/compare',   builder: (_, $) => const ComparePage()),
+
+    // Editorial rankings — outside shell
+    GoRoute(
+      path: '/editorial',
+      builder: (_, $) => const EditorialHubPage(),
+      routes: [
+        GoRoute(
+          path: ':slug',
+          builder: (_, state) => EditorialListPage(
+              slug: state.pathParameters['slug'] ?? ''),
+        ),
+      ],
+    ),
+
+    // Calculators — outside shell (full screen, back button)
+    GoRoute(
+      path: '/calculators',
+      builder: (_, $) => const CalculatorsHubPage(),
+      routes: [
+        GoRoute(path: 'compound-interest', builder: (_, $) => const CompoundInterestPage()),
+        GoRoute(path: 'simple-interest',   builder: (_, $) => const SimpleInterestPage()),
+        GoRoute(path: 'first-million',     builder: (_, $) => const FirstMillionPage()),
+        GoRoute(path: 'percentage',        builder: (_, $) => const PercentagePage()),
+        GoRoute(path: 'dca',               builder: (_, $) => const DCAPage()),
+        GoRoute(path: 'roi',               builder: (_, $) => const ROIPage()),
+      ],
+    ),
 
     // Detail pages — outside shell (full screen, back button, no bottom nav)
     GoRoute(

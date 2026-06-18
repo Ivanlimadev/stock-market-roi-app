@@ -109,3 +109,21 @@ class DividendInfo {
   double get annualTotal => (dividendRate ?? 0) * netShares;
   double get yieldPct => (dividendYield ?? 0) * 100;
 }
+
+class PortfolioSnapshot {
+  final String date; // YYYY-MM-DD
+  final double totalValue;
+  final double totalInvested;
+
+  const PortfolioSnapshot({
+    required this.date,
+    required this.totalValue,
+    required this.totalInvested,
+  });
+
+  factory PortfolioSnapshot.fromJson(Map<String, dynamic> j) => PortfolioSnapshot(
+        date:          j['snapshot_date'] as String,
+        totalValue:    (j['total_value']    as num).toDouble(),
+        totalInvested: (j['total_invested'] as num).toDouble(),
+      );
+}

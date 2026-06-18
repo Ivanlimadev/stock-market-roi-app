@@ -33,9 +33,13 @@ dependencies:
   # Blog / markdown
   flutter_markdown: ^0.7.6
 
+  # In-app WebView
+  webview_flutter: ^4.10.0
+
   # Utils
   intl: ^0.20.2
   url_launcher: ^6.3.1
+  web_socket_channel: ^2.4.0
 
   cupertino_icons: ^1.0.8
 

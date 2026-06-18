@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
@@ -11,6 +12,9 @@ import '../../core/models/stock_detail_model.dart';
 import '../../core/models/blog_post_model.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/providers/watchlist_provider.dart';
+import '../../core/widgets/add_alert_dialog.dart';
+import '../../core/providers/financials_provider.dart';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -20,13 +24,48 @@ class StockDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sym   = symbol.toUpperCase();
-    final async = ref.watch(stockDetailProvider(sym));
+    final sym          = symbol.toUpperCase();
+    final async        = ref.watch(stockDetailProvider(sym));
+    final inWatchlist  = ref.watch(watchlistSymbolsProvider).contains(sym);
+    final isLoggedIn   = Supabase.instance.client.auth.currentUser != null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(sym),
         actions: [
+          if (isLoggedIn) ...[
+            IconButton(
+              icon: Icon(
+                inWatchlist ? Icons.star_rounded : Icons.star_border_rounded,
+                color: inWatchlist ? const Color(0xFFF59E0B) : null,
+              ),
+              tooltip: inWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+              onPressed: () async {
+                if (inWatchlist) {
+                  await WatchlistService.removeStock(sym);
+                } else {
+                  final name = async.asData?.value.name ?? sym;
+                  await WatchlistService.addStock(symbol: sym, name: name);
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.notifications_none_rounded),
+              tooltip: 'Set price alert',
+              onPressed: () {
+                final price = async.asData?.value.currentPrice;
+                if (price == null) return;
+                final name = async.asData?.value.name ?? sym;
+                showAddAlertDialog(
+                  context,
+                  symbol: sym,
+                  name: name,
+                  currentPrice: price,
+                  assetType: 'stock',
+                );
+              },
+            ),
+          ],
           IconButton(
             icon: Icon(Icons.refresh_rounded),
             onPressed: () {
@@ -193,6 +232,11 @@ class _BodyState extends ConsumerState<_Body> {
 
         SizedBox(height: 12),
 
+        // ── Performance Strip ─────────────────────────────────────────────────
+        _PerformanceStrip(history: history, currentPrice: stock.currentPrice),
+
+        SizedBox(height: 4),
+
         // ── AI Insight ───────────────────────────────────────────────────────
         _AIInsightCard(sym: sym),
 
@@ -207,12 +251,22 @@ class _BodyState extends ConsumerState<_Body> {
         if (info?.nextEarningsDate != null || info?.eps != null)
           _EarningsCard(info: info!),
 
+        // ── Earnings History (quarterly EPS) ─────────────────────────────────
+        _EarningsHistorySection(sym: sym),
+
+        // ── Financial Charts (revenue / net income) ───────────────────────────
+        _FinancialSection(sym: sym),
+
         // ── Key Statistics ───────────────────────────────────────────────────
         if (info != null) _KeyStats(info: info, stock: stock),
 
         // ── Dividends ────────────────────────────────────────────────────────
         if (stock.dividends.isNotEmpty)
           _DividendsCard(dividends: stock.dividends, info: info),
+
+        // ── Magic Number ─────────────────────────────────────────────────────
+        if (stock.dividends.isNotEmpty)
+          _MagicNumber(dividends: stock.dividends, price: stock.currentPrice),
 
         // ── Buy & Hold Checklist ─────────────────────────────────────────────
         if (info != null) _BuyHoldChecklist(
@@ -227,6 +281,9 @@ class _BodyState extends ConsumerState<_Body> {
         // ── About ────────────────────────────────────────────────────────────
         if (info?.description != null && info!.description!.isNotEmpty)
           _About(text: info.description!),
+
+        // ── SEC Filings ───────────────────────────────────────────────────────
+        _SecFilingsSection(sym: sym),
 
         // ── Related Articles ──────────────────────────────────────────────────
         _RelatedArticles(sym: sym),
@@ -1618,6 +1675,82 @@ class _SimCard extends StatelessWidget {
   }
 }
 
+// ── Performance Strip ─────────────────────────────────────────────────────────
+
+class _PerformanceStrip extends StatelessWidget {
+  final AsyncValue<List<HistoryBar>> history;
+  final double currentPrice;
+  const _PerformanceStrip({required this.history, required this.currentPrice});
+
+  @override
+  Widget build(BuildContext context) {
+    return history.maybeWhen(
+      data: (bars) {
+        if (bars.length < 2) return const SizedBox.shrink();
+
+        double? _ret(int n) {
+          if (bars.length <= n) return null;
+          final base = bars[bars.length - 1 - n].close;
+          if (base <= 0) return null;
+          return (currentPrice / base - 1) * 100;
+        }
+
+        final periods = [
+          ('1D',  _ret(1)),
+          ('5D',  _ret(5)),
+          ('1M',  _ret(21)),
+          ('3M',  _ret(63)),
+          ('6M',  _ret(126)),
+          ('1Y',  _ret(bars.length - 1)),
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              border: Border.all(color: context.colors.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: periods.map((p) {
+                final pct   = p.$2;
+                final isPos = (pct ?? 0) >= 0;
+                final color = pct == null
+                    ? context.colors.textMuted
+                    : (isPos ? AppColors.emerald : AppColors.red);
+                return Expanded(
+                  child: Column(
+                    children: [
+                      Text(p.$1,
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: context.colors.textMuted)),
+                      const SizedBox(height: 3),
+                      Text(
+                        pct == null
+                            ? '—'
+                            : '${isPos ? '+' : ''}${pct.toStringAsFixed(2)}%',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: color),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
 class _RowList extends StatelessWidget {
   final List<(String, String)> rows;
   const _RowList({required this.rows});
@@ -1648,6 +1781,557 @@ class _RowList extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ── Earnings History Section ──────────────────────────────────────────────────
+
+class _EarningsHistorySection extends ConsumerWidget {
+  final String sym;
+  const _EarningsHistorySection({required this.sym});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(stockFinancialsProvider(sym));
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (fin) {
+        final quarters = fin.quarterly.where((q) => q.eps != null).take(8).toList();
+        if (quarters.isEmpty) return const SizedBox.shrink();
+        final c = context.colors;
+        return _Section(
+          title: 'Quarterly Earnings (EPS)',
+          child: Column(
+            children: quarters.asMap().entries.map((e) {
+              final isLast = e.key == quarters.length - 1;
+              final q      = e.value;
+              final eps    = q.eps!;
+              final isPos  = eps >= 0;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  border: isLast ? null : Border(
+                    bottom: BorderSide(color: c.surfaceAlt, width: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    Text(q.date.length >= 7 ? q.date.substring(0, 7) : q.date,
+                        style: TextStyle(fontSize: 13, color: c.textMuted)),
+                    const Spacer(),
+                    if (q.revenue != null)
+                      Text(fmtBigUsd(q.revenue!),
+                          style: TextStyle(fontSize: 12, color: c.textSecond)),
+                    SizedBox(width: 16),
+                    Container(
+                      width: 72,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'EPS \$${eps.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: isPos ? AppColors.emerald : AppColors.red,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Financial Charts Section ──────────────────────────────────────────────────
+
+class _FinancialSection extends ConsumerStatefulWidget {
+  final String sym;
+  const _FinancialSection({required this.sym});
+
+  @override
+  ConsumerState<_FinancialSection> createState() => _FinancialSectionState();
+}
+
+class _FinancialSectionState extends ConsumerState<_FinancialSection> {
+  bool _quarterly = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(stockFinancialsProvider(widget.sym));
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (fin) {
+        final periods = _quarterly ? fin.quarterly.take(8).toList() : fin.annual;
+        final filtered = periods
+            .where((p) => p.revenue != null || p.netIncome != null)
+            .toList();
+        if (filtered.isEmpty) return const SizedBox.shrink();
+
+        return _Section(
+          title: 'Financial Charts',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── CAGR chips + tab toggle ─────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    if (!_quarterly && fin.cagr5yRevenue != null)
+                      _FinChip(
+                        'Rev. CAGR 5Y',
+                        '${((fin.cagr5yRevenue! - 1) * 100).toStringAsFixed(1)}%',
+                        fin.cagr5yRevenue! >= 1,
+                      ),
+                    if (!_quarterly && fin.cagr5yNetIncome != null) ...[
+                      SizedBox(width: 8),
+                      _FinChip(
+                        'NI CAGR 5Y',
+                        '${((fin.cagr5yNetIncome! - 1) * 100).toStringAsFixed(1)}%',
+                        fin.cagr5yNetIncome! >= 1,
+                      ),
+                    ],
+                    const Spacer(),
+                    _PillToggle(
+                      options: const ['Annual', 'Quarterly'],
+                      selected: _quarterly ? 1 : 0,
+                      onTap: (i) => setState(() => _quarterly = i == 1),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Legend ──────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    _LegendDot(color: AppColors.emerald, label: 'Revenue'),
+                    SizedBox(width: 16),
+                    _LegendDot(color: const Color(0xFF6366F1), label: 'Net Income'),
+                  ],
+                ),
+              ),
+
+              // ── Bar chart ───────────────────────────────────────────────
+              SizedBox(
+                height: 160,
+                child: _FinBarChart(periods: filtered),
+              ),
+              SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FinBarChart extends StatelessWidget {
+  final List<FinancialPeriod> periods;
+  const _FinBarChart({required this.periods});
+
+  @override
+  Widget build(BuildContext context) {
+    if (periods.isEmpty) return const SizedBox.shrink();
+    final c = context.colors;
+
+    double maxVal = 0;
+    for (final p in periods) {
+      if ((p.revenue ?? 0) > maxVal) maxVal = p.revenue!;
+      if ((p.netIncome ?? 0).abs() > maxVal) maxVal = p.netIncome!.abs();
+    }
+    if (maxVal == 0) return const SizedBox.shrink();
+
+    String _shortDate(String d) =>
+        d.length >= 7 ? d.substring(2, 7) : d;
+
+    String _fmtY(double v) {
+      if (v.abs() >= 1e9) return '\$${(v / 1e9).toStringAsFixed(0)}B';
+      if (v.abs() >= 1e6) return '\$${(v / 1e6).toStringAsFixed(0)}M';
+      return '\$${v.toStringAsFixed(0)}';
+    }
+
+    return BarChart(
+      BarChartData(
+        maxY: maxVal * 1.15,
+        minY: 0,
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipColor: (_) => c.surface,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final label = rodIndex == 0 ? 'Rev' : 'NI';
+              return BarTooltipItem(
+                '$label ${_fmtY(rod.toY)}',
+                TextStyle(
+                  color: rodIndex == 0 ? AppColors.emerald : const Color(0xFF6366F1),
+                  fontSize: 11, fontWeight: FontWeight.w600,
+                ),
+              );
+            },
+          ),
+        ),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) => FlLine(
+              color: c.surfaceAlt.withValues(alpha: 0.6), strokeWidth: 0.5),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (v, _) {
+                final i = v.toInt();
+                if (i < 0 || i >= periods.length) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(_shortDate(periods[i].date),
+                      style: TextStyle(fontSize: 9, color: c.textMuted)),
+                );
+              },
+            ),
+          ),
+        ),
+        barGroups: periods.asMap().entries.map((e) {
+          final i = e.key;
+          final p = e.value;
+          return BarChartGroupData(
+            x: i,
+            groupVertically: false,
+            barRods: [
+              BarChartRodData(
+                toY: (p.revenue ?? 0).clamp(0, double.infinity).toDouble(),
+                color: AppColors.emerald.withValues(alpha: 0.85),
+                width: 7,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+              ),
+              BarChartRodData(
+                toY: (p.netIncome ?? 0).clamp(0, double.infinity).toDouble(),
+                color: const Color(0xFF6366F1).withValues(alpha: 0.85),
+                width: 7,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _FinChip extends StatelessWidget {
+  final String label, value;
+  final bool positive;
+  const _FinChip(this.label, this.value, this.positive);
+
+  @override
+  Widget build(BuildContext context) {
+    final color = positive ? AppColors.emerald : AppColors.red;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 9, color: context.colors.textMuted)),
+          SizedBox(height: 1),
+          Text(value,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PillToggle extends StatelessWidget {
+  final List<String> options;
+  final int selected;
+  final ValueChanged<int> onTap;
+  const _PillToggle({required this.options, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: c.surfaceAlt,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: options.asMap().entries.map((e) {
+          final active = e.key == selected;
+          return GestureDetector(
+            onTap: () => onTap(e.key),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? AppColors.emerald : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(e.value,
+                  style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: active ? Colors.white : c.textMuted,
+                  )),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(width: 10, height: 10,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+      SizedBox(width: 5),
+      Text(label, style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+    ],
+  );
+}
+
+// ── Magic Number ──────────────────────────────────────────────────────────────
+
+class _MagicNumber extends StatelessWidget {
+  final List<DividendPayment> dividends;
+  final double price;
+  const _MagicNumber({required this.dividends, required this.price});
+
+  int? _detectFrequencyPerYear() {
+    if (dividends.length < 2) return 4;
+    final sorted = dividends
+        .take(8)
+        .map((d) => DateTime.tryParse(d.date)?.millisecondsSinceEpoch ?? 0)
+        .where((t) => t > 0)
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+    if (sorted.length < 2) return 4;
+    double total = 0;
+    for (int i = 0; i < sorted.length - 1; i++) {
+      total += (sorted[i] - sorted[i + 1]) / 86400000.0;
+    }
+    final avg = total / (sorted.length - 1);
+    if (avg <= 35)  return 12;
+    if (avg <= 100) return 4;
+    if (avg <= 200) return 2;
+    return 1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lastDiv = dividends.first.amount;
+    if (lastDiv <= 0 || price <= 0) return const SizedBox.shrink();
+
+    final perYear    = _detectFrequencyPerYear() ?? 4;
+    final label      = perYear == 12 ? 'month' : perYear == 4 ? 'quarter'
+                     : perYear == 2 ? 'semester' : 'year';
+    final magic      = (price / lastDiv).ceil();
+    final invested   = magic * price;
+
+    final c = context.colors;
+    return _Section(
+      title: 'Magic Number',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Shares needed so each ${label}ly dividend pays for 1 new share.',
+                style: TextStyle(fontSize: 12, color: c.textMuted, height: 1.4)),
+            SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _MagicPill(label: 'Price', value: fmtStockPrice(price)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('÷', style: TextStyle(fontSize: 22, color: c.textMuted)),
+                ),
+                _MagicPill(label: 'Last div. ($label)',
+                    value: '\$${lastDiv.toStringAsFixed(4)}'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('=', style: TextStyle(fontSize: 22, color: c.textMuted)),
+                ),
+                Column(
+                  children: [
+                    Text('$magic',
+                        style: TextStyle(fontSize: 30,
+                            fontWeight: FontWeight.w900, color: AppColors.emerald)),
+                    Text('shares',
+                        style: TextStyle(fontSize: 10, color: c.textMuted)),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _MagicStat('Investment target', fmtStockPrice(invested)),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: _MagicStat('New shares / year', '+$perYear shares',
+                      green: true),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MagicPill extends StatelessWidget {
+  final String label, value;
+  const _MagicPill({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text(value,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+              color: context.colors.textPrimary)),
+      SizedBox(height: 2),
+      Text(label.toUpperCase(),
+          style: TextStyle(fontSize: 9, color: context.colors.textMuted,
+              letterSpacing: 0.5)),
+    ],
+  );
+}
+
+class _MagicStat extends StatelessWidget {
+  final String label, value;
+  final bool green;
+  const _MagicStat(this.label, this.value, {this.green = false});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: context.colors.background,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: context.colors.surfaceAlt),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+        SizedBox(height: 4),
+        Text(value,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                color: green ? AppColors.emerald : context.colors.textPrimary)),
+      ],
+    ),
+  );
+}
+
+// ── SEC Filings Section ───────────────────────────────────────────────────────
+
+class _SecFilingsSection extends ConsumerWidget {
+  final String sym;
+  const _SecFilingsSection({required this.sym});
+
+  Color _formColor(String form) {
+    if (form == '10-K') return const Color(0xFF6366F1);
+    if (form == '10-Q') return AppColors.emerald;
+    if (form == '8-K')  return AppColors.orange;
+    return const Color(0xFF6B7280);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(stockFilingsProvider(sym));
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (filings) {
+        if (filings.isEmpty) return const SizedBox.shrink();
+        final c = context.colors;
+        return _Section(
+          title: 'SEC Filings',
+          child: Column(
+            children: filings.take(8).toList().asMap().entries.map((e) {
+              final isLast = e.key == filings.take(8).length - 1;
+              final f      = e.value;
+              final color  = _formColor(f.form);
+              return InkWell(
+                onTap: f.url.isNotEmpty
+                    ? () => launchUrl(Uri.parse(f.url),
+                          mode: LaunchMode.externalApplication)
+                    : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: isLast ? null : Border(
+                      bottom: BorderSide(color: c.surfaceAlt, width: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(f.form,
+                            style: TextStyle(fontSize: 11,
+                                fontWeight: FontWeight.w800, color: color)),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(f.description.isNotEmpty ? f.description : f.form,
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 13, color: c.textPrimary,
+                                    fontWeight: FontWeight.w500)),
+                            Text(f.filingDate,
+                                style: TextStyle(fontSize: 11, color: c.textMuted)),
+                          ],
+                        ),
+                      ),
+                      if (f.url.isNotEmpty) ...[
+                        SizedBox(width: 8),
+                        Icon(Icons.open_in_new_rounded, size: 14, color: c.textMuted),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }

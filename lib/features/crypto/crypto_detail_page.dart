@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/api/api_client.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,9 @@ import '../../core/providers/blog_provider.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/providers/realtime_price_provider.dart';
+import '../../core/providers/watchlist_provider.dart';
+import '../../core/widgets/add_alert_dialog.dart';
+import '../../core/providers/financials_provider.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -156,7 +160,9 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(cryptoDetailProvider(widget.coinId));
+    final async       = ref.watch(cryptoDetailProvider(widget.coinId));
+    final inWatchlist = ref.watch(watchlistCryptoIdsProvider).contains(widget.coinId);
+    final isLoggedIn  = Supabase.instance.client.auth.currentUser != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -164,9 +170,48 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
           widget.coinId[0].toUpperCase() + widget.coinId.substring(1),
         ),
         actions: [
-          IconButton(icon: Icon(Icons.refresh_rounded), onPressed: _refresh),
+          if (isLoggedIn) ...[
+            IconButton(
+              icon: Icon(
+                inWatchlist ? Icons.star_rounded : Icons.star_border_rounded,
+                color: inWatchlist ? const Color(0xFFF59E0B) : null,
+              ),
+              tooltip: inWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+              onPressed: () async {
+                if (inWatchlist) {
+                  await WatchlistService.removeCrypto(widget.coinId);
+                } else {
+                  final detail = async.asData?.value;
+                  await WatchlistService.addCrypto(
+                    coinId: widget.coinId,
+                    symbol: detail?.symbol.toUpperCase() ?? widget.coinId.toUpperCase(),
+                    name:   detail?.name ?? widget.coinId,
+                    image:  detail?.image,
+                  );
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.notifications_none_rounded),
+              tooltip: 'Set price alert',
+              onPressed: () {
+                final detail = async.asData?.value;
+                if (detail == null) return;
+                showAddAlertDialog(
+                  context,
+                  symbol:      detail.symbol.toUpperCase(),
+                  name:        detail.name,
+                  currentPrice: detail.marketData.currentPrice,
+                  assetType:   'crypto',
+                  coingeckoId: widget.coinId,
+                  image:       detail.image,
+                );
+              },
+            ),
+          ],
+          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
           IconButton(
-            icon: Icon(Icons.open_in_new),
+            icon: const Icon(Icons.open_in_new),
             onPressed: () => launchUrl(
               Uri.parse('https://stockmarketroi.com/crypto/${widget.coinId}'),
               mode: LaunchMode.externalApplication,
@@ -394,9 +439,15 @@ class _CryptoBody extends ConsumerWidget {
         // ── Supply ────────────────────────────────────────────────────────────
         _SupplySection(md: md, symbol: coin.symbol),
 
+        // ── Exchange Listings ─────────────────────────────────────────────────
+        _ExchangeListings(coinId: coinId),
+
         // ── About ─────────────────────────────────────────────────────────────
         if (coin.description != null && coin.description!.isNotEmpty)
           _AboutSection(text: coin.description!),
+
+        // ── ROI Calculator ────────────────────────────────────────────────────
+        _RoiCalcBanner(coinId: coinId, price: coin.marketData.currentPrice),
 
         // ── Related articles ──────────────────────────────────────────────────
         _RelatedArticles(coinId: coinId),
@@ -890,5 +941,183 @@ String _fmtDate(String iso) {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   } catch (_) {
     return iso.substring(0, 10);
+  }
+}
+
+// ── ROI Calculator Banner ─────────────────────────────────────────────────────
+
+class _RoiCalcBanner extends StatelessWidget {
+  final String coinId;
+  final double price;
+  const _RoiCalcBanner({required this.coinId, required this.price});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: GestureDetector(
+        onTap: () => context.push('/calculators/roi'),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF97316).withValues(alpha: 0.08),
+            border: Border.all(
+                color: const Color(0xFFF97316).withValues(alpha: 0.25)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF97316).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.arrow_upward_rounded,
+                    size: 20, color: const Color(0xFFF97316)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ROI Calculator',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: c.textPrimary)),
+                    const SizedBox(height: 2),
+                    Text('Calculate returns on your ${coinId[0].toUpperCase()}${coinId.substring(1)} investment',
+                        style: TextStyle(fontSize: 12, color: c.textMuted)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  size: 18, color: c.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Exchange Listings ─────────────────────────────────────────────────────────
+
+class _ExchangeListings extends ConsumerWidget {
+  final String coinId;
+  const _ExchangeListings({required this.coinId});
+
+  Color _trustColor(String? score) {
+    if (score == 'green')  return AppColors.emerald;
+    if (score == 'yellow') return const Color(0xFFF59E0B);
+    return AppColors.red;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(cryptoTickersProvider(coinId));
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (tickers) {
+        if (tickers.isEmpty) return const SizedBox.shrink();
+        final c = context.colors;
+        return _CardSection(
+          title: 'Exchange Listings',
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('Exchange',
+                        style: TextStyle(fontSize: 11, color: c.textMuted,
+                            fontWeight: FontWeight.w600))),
+                    SizedBox(width: 60,
+                        child: Text('Price', textAlign: TextAlign.right,
+                            style: TextStyle(fontSize: 11, color: c.textMuted,
+                                fontWeight: FontWeight.w600))),
+                    SizedBox(width: 70,
+                        child: Text('Vol 24h', textAlign: TextAlign.right,
+                            style: TextStyle(fontSize: 11, color: c.textMuted,
+                                fontWeight: FontWeight.w600))),
+                    SizedBox(width: 14),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: c.surfaceAlt),
+              ...tickers.asMap().entries.map((e) {
+                final isLast = e.key == tickers.length - 1;
+                final t      = e.value;
+                return InkWell(
+                  onTap: t.tradeUrl != null && t.tradeUrl!.isNotEmpty
+                      ? () => launchUrl(Uri.parse(t.tradeUrl!),
+                            mode: LaunchMode.externalApplication)
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                    decoration: BoxDecoration(
+                      border: isLast ? null : Border(
+                        bottom: BorderSide(color: c.surfaceAlt, width: 0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6, height: 6,
+                          decoration: BoxDecoration(
+                            color: _trustColor(t.trustScore),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.exchange,
+                                  style: TextStyle(fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: c.textPrimary)),
+                              Text(t.target,
+                                  style: TextStyle(fontSize: 11, color: c.textMuted)),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 60,
+                          child: Text(
+                            t.price >= 1000
+                                ? '\$${t.price.toStringAsFixed(0)}'
+                                : '\$${t.price.toStringAsFixed(2)}',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(fontSize: 13,
+                                fontWeight: FontWeight.w600, color: c.textPrimary),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: Text(
+                            fmtBigUsd(t.volume24h),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(fontSize: 12, color: c.textSecond),
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        if (t.tradeUrl != null && t.tradeUrl!.isNotEmpty)
+                          Icon(Icons.open_in_new_rounded, size: 12, color: c.textMuted)
+                        else
+                          SizedBox(width: 12),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

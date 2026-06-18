@@ -138,20 +138,45 @@ class _ResumoTab extends ConsumerWidget {
   }
 }
 
-class _ResumoContent extends StatelessWidget {
+class _ResumoContent extends ConsumerStatefulWidget {
   final List<PortfolioHolding> holdings;
   const _ResumoContent({required this.holdings});
 
-  double get _totalValue => holdings.fold(0, (s, h) => s + h.currentValue);
-  double get _totalInvested => holdings.fold(0, (s, h) => s + h.costBasis);
+  @override
+  ConsumerState<_ResumoContent> createState() => _ResumoContentState();
+}
+
+class _ResumoContentState extends ConsumerState<_ResumoContent> {
+  bool _snapshotSaved = false;
+
+  double get _totalValue =>
+      widget.holdings.fold(0, (s, h) => s + h.currentValue);
+  double get _totalInvested =>
+      widget.holdings.fold(0, (s, h) => s + h.costBasis);
   double get _totalGain => _totalValue - _totalInvested;
   double get _totalGainPct =>
       _totalInvested > 0 ? (_totalGain / _totalInvested) * 100 : 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _saveSnapshot());
+  }
+
+  Future<void> _saveSnapshot() async {
+    if (_snapshotSaved || _totalValue <= 0) return;
+    _snapshotSaved = true;
+    await savePortfolioSnapshotIfNeeded(
+      totalValue: _totalValue,
+      totalInvested: _totalInvested,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    final fmt        = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     final isPositive = _totalGain >= 0;
+    final snapshots  = ref.watch(portfolioSnapshotsProvider);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
@@ -186,17 +211,29 @@ class _ResumoContent extends StatelessWidget {
           SizedBox(width: 12),
           _KpiCard(
             label: 'Rentabilidade',
-            value:
-                '${_totalGainPct >= 0 ? '+' : ''}${_totalGainPct.toStringAsFixed(2)}%',
+            value: '${_totalGainPct >= 0 ? '+' : ''}${_totalGainPct.toStringAsFixed(2)}%',
             icon: Icons.percent_rounded,
             color: _totalGainPct >= 0 ? AppColors.emerald : AppColors.red,
             valueColor: _totalGainPct >= 0 ? AppColors.emerald : AppColors.red,
           ),
         ]),
+
+        // ── Portfolio history chart ─────────────────────────────────────────
+        snapshots.maybeWhen(
+          data: (snaps) {
+            if (snaps.length < 2) return const SizedBox(height: 24);
+            return Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: _PortfolioHistoryChart(snapshots: snaps),
+            );
+          },
+          orElse: () => const SizedBox(height: 24),
+        ),
+
         SizedBox(height: 24),
 
         // ── Allocation donut ────────────────────────────────────────────────
-        _AllocationSection(holdings: holdings),
+        _AllocationSection(holdings: widget.holdings),
         SizedBox(height: 24),
 
         // ── Top holdings ────────────────────────────────────────────────────
@@ -206,10 +243,94 @@ class _ResumoContent extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: context.colors.textPrimary)),
         SizedBox(height: 12),
-        ...holdings
-            .take(5)
-            .map((h) => _HoldingTile(holding: h)),
+        ...widget.holdings.take(5).map((h) => _HoldingTile(holding: h)),
       ],
+    );
+  }
+}
+
+// ── Portfolio history chart ───────────────────────────────────────────────────
+
+class _PortfolioHistoryChart extends StatelessWidget {
+  final List<PortfolioSnapshot> snapshots;
+  const _PortfolioHistoryChart({required this.snapshots});
+
+  @override
+  Widget build(BuildContext context) {
+    final c      = context.colors;
+    final values = snapshots.map((s) => s.totalValue).toList();
+    final minY   = values.reduce((a, b) => a < b ? a : b) * 0.98;
+    final maxY   = values.reduce((a, b) => a > b ? a : b) * 1.02;
+    final isPos  = values.last >= values.first;
+    final color  = isPos ? AppColors.emerald : AppColors.red;
+
+    final spots = List.generate(
+      snapshots.length,
+      (i) => FlSpot(i.toDouble(), snapshots[i].totalValue),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Portfolio History',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: c.textPrimary)),
+          const SizedBox(height: 4),
+          Text(
+            '${isPos ? '+' : ''}${((values.last / values.first - 1) * 100).toStringAsFixed(2)}% all time',
+            style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: LineChart(
+              LineChartData(
+                minY: minY,
+                maxY: maxY,
+                gridData: FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(show: false),
+                lineTouchData: LineTouchData(enabled: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: color,
+                    barWidth: 2,
+                    dotData: FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: color.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(snapshots.first.date,
+                  style: TextStyle(fontSize: 10, color: c.textMuted)),
+              Text(snapshots.last.date,
+                  style: TextStyle(fontSize: 10, color: c.textMuted)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
