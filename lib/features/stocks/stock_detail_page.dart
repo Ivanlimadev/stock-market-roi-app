@@ -76,14 +76,16 @@ class StockDetailPage extends ConsumerWidget {
               ref.invalidate(stockHistoryProvider(sym));
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: 'Share',
-            onPressed: () => shareWithImage(
-              context: context,
-              text: '$sym — ${async.asData?.value.name ?? sym}\nhttps://stockmarketroi.com/stocks/${sym.toLowerCase()}',
-              imageUrl: 'https://assets.parqet.com/logos/symbol/$sym?format=png',
-              filename: '$sym.png',
+          Builder(
+            builder: (btnCtx) => IconButton(
+              icon: const Icon(Icons.share_rounded),
+              tooltip: 'Share',
+              onPressed: () => shareWithImage(
+                btnCtx: btnCtx,
+                text: '$sym — ${async.asData?.value.name ?? sym}\nhttps://stockmarketroi.com/stocks/${sym.toLowerCase()}',
+                imageUrl: 'https://assets.parqet.com/logos/symbol/$sym?format=png',
+                filename: '$sym.png',
+              ),
             ),
           ),
         ],
@@ -240,7 +242,7 @@ class _BodyState extends ConsumerState<_Body> {
         SizedBox(height: 12),
 
         // ── Performance Strip ─────────────────────────────────────────────────
-        _PerformanceStrip(history: history, currentPrice: stock.currentPrice),
+        _PerformanceStrip(history: history, currentPrice: stock.currentPrice, changePct1d: stock.changePct),
 
         SizedBox(height: 4),
 
@@ -1688,7 +1690,8 @@ class _SimCard extends StatelessWidget {
 class _PerformanceStrip extends StatelessWidget {
   final AsyncValue<List<HistoryBar>> history;
   final double currentPrice;
-  const _PerformanceStrip({required this.history, required this.currentPrice});
+  final double changePct1d;
+  const _PerformanceStrip({required this.history, required this.currentPrice, required this.changePct1d});
 
   @override
   Widget build(BuildContext context) {
@@ -1704,7 +1707,7 @@ class _PerformanceStrip extends StatelessWidget {
         }
 
         final periods = [
-          ('1D',  _ret(1)),
+          ('1D',  changePct1d),   // YF real-time — mais preciso que EOD
           ('5D',  _ret(5)),
           ('1M',  _ret(21)),
           ('3M',  _ret(63)),

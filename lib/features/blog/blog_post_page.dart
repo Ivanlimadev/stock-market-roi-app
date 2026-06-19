@@ -196,22 +196,24 @@ class _PostBody extends ConsumerWidget {
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: 'Share',
-            onPressed: () {
-              final text = '${post.title}\nhttps://stockmarketroi.com/blog/${post.slug}';
-              if (post.imageUrl != null) {
-                shareWithImage(
-                  context: context,
-                  text: text,
-                  imageUrl: post.imageUrl!,
-                  filename: '${post.slug}.jpg',
-                );
-              } else {
-                shareText(context, text);
-              }
-            },
+          Builder(
+            builder: (btnCtx) => IconButton(
+              icon: const Icon(Icons.share_rounded),
+              tooltip: 'Share',
+              onPressed: () {
+                final text = '${post.title}\nhttps://stockmarketroi.com/blog/${post.slug}';
+                if (post.imageUrl != null) {
+                  shareWithImage(
+                    btnCtx: btnCtx,
+                    text: text,
+                    imageUrl: post.imageUrl!,
+                    filename: '${post.slug}.jpg',
+                  );
+                } else {
+                  shareText(btnCtx, text);
+                }
+              },
+            ),
           ),
         ],
       ),
