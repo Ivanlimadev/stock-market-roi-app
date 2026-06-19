@@ -14,6 +14,7 @@ import '../../core/providers/realtime_price_provider.dart';
 import '../../core/providers/watchlist_provider.dart';
 import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
+import '../../core/widgets/app_footer.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -452,7 +453,8 @@ class _CryptoBody extends ConsumerWidget {
         // ── Related articles ──────────────────────────────────────────────────
         _RelatedArticles(coinId: coinId),
 
-        SizedBox(height: 32),
+        // ── Footer ────────────────────────────────────────────────────────────
+        const AppFooter(),
       ],
     );
   }

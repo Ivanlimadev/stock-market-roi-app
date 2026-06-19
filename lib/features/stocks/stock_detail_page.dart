@@ -15,6 +15,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/providers/watchlist_provider.dart';
 import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
+import '../../core/widgets/app_footer.dart';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -288,7 +289,8 @@ class _BodyState extends ConsumerState<_Body> {
         // ── Related Articles ──────────────────────────────────────────────────
         _RelatedArticles(sym: sym),
 
-        SizedBox(height: 32),
+        // ── Footer ────────────────────────────────────────────────────────────
+        const AppFooter(),
       ],
     );
   }
