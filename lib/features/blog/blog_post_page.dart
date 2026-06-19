@@ -520,17 +520,17 @@ class _TickerCard extends ConsumerWidget {
                 ),
               ),
 
-              // ── Métricas (fundo escuro) ───────────────────────────────
-              Container(
-                width: double.infinity,
-                color: const Color(0xFF0F1923),
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+              // ── Métricas ─────────────────────────────────────────────
+              Divider(height: 1, color: c.border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 child: Column(
                   children: [
                     Row(children: [
                       _MetricTile(
                         label: 'Price',
                         value: '\$${_fmt(stock.currentPrice)}',
+                        valueColor: c.textPrimary,
                       ),
                       _MetricTile(
                         label: 'Chg (12M)',
@@ -538,7 +538,7 @@ class _TickerCard extends ConsumerWidget {
                             ? '${isUp ? '+' : ''}${change12m!.toStringAsFixed(2)}%'
                             : '--',
                         valueColor: change12m == null
-                            ? Colors.white
+                            ? c.textPrimary
                             : isUp ? AppColors.emerald : AppColors.red,
                         trailing: change12m != null
                             ? Icon(
@@ -556,12 +556,14 @@ class _TickerCard extends ConsumerWidget {
                         value: info?.profitMargin != null
                             ? '${(info!.profitMargin! * 100).toStringAsFixed(2)}%'
                             : '--',
+                        valueColor: c.textPrimary,
                       ),
                       _MetricTile(
                         label: 'Div. Yield',
                         value: info?.dividendYield != null
                             ? '${(info!.dividendYield! * 100).toStringAsFixed(2)}%'
                             : '--',
+                        valueColor: c.textPrimary,
                       ),
                     ]),
                     const SizedBox(height: 16),
@@ -569,18 +571,20 @@ class _TickerCard extends ConsumerWidget {
                       _MetricTile(
                         label: 'P/E',
                         value: info?.pe != null ? _fmt(info!.pe!) : '--',
+                        valueColor: c.textPrimary,
                       ),
                       _MetricTile(
                         label: 'P/B',
                         value: info?.priceToBook != null ? _fmt(info!.priceToBook!) : '--',
+                        valueColor: c.textPrimary,
                       ),
                     ]),
-                    const SizedBox(height: 20),
-                    OutlinedButton(
+                    const SizedBox(height: 16),
+                    FilledButton(
                       onPressed: () => context.push('/stocks/$ticker'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: const BorderSide(color: Colors.white24),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.emerald,
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 44),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -620,7 +624,7 @@ class _MetricTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF6B8BA4))),
+              style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -628,7 +632,7 @@ class _MetricTile extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: valueColor ?? Colors.white)),
+                      color: valueColor ?? context.colors.textPrimary)),
               if (trailing != null) ...[
                 const SizedBox(width: 4),
                 trailing!,
