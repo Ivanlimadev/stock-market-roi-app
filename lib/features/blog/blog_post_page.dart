@@ -3,8 +3,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/utils/share_utils.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/providers/blog_provider.dart';
@@ -200,11 +200,17 @@ class _PostBody extends ConsumerWidget {
             icon: const Icon(Icons.share_rounded),
             tooltip: 'Share',
             onPressed: () {
-              final size = MediaQuery.sizeOf(context);
-              Share.share(
-                '${post.title}\nhttps://stockmarketroi.com/blog/${post.slug}',
-                sharePositionOrigin: Rect.fromLTWH(0, 0, size.width, size.height),
-              );
+              final text = '${post.title}\nhttps://stockmarketroi.com/blog/${post.slug}';
+              if (post.imageUrl != null) {
+                shareWithImage(
+                  context: context,
+                  text: text,
+                  imageUrl: post.imageUrl!,
+                  filename: '${post.slug}.jpg',
+                );
+              } else {
+                shareText(context, text);
+              }
             },
           ),
         ],

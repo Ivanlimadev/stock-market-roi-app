@@ -15,7 +15,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/providers/watchlist_provider.dart';
 import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../core/utils/share_utils.dart';
 import '../../core/widgets/app_footer.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
@@ -79,13 +79,12 @@ class StockDetailPage extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.share_rounded),
             tooltip: 'Share',
-            onPressed: () {
-              final size = MediaQuery.sizeOf(context);
-              Share.share(
-                '$sym — ${async.asData?.value.name ?? sym}\nhttps://stockmarketroi.com/stocks/${sym.toLowerCase()}',
-                sharePositionOrigin: Rect.fromLTWH(0, 0, size.width, size.height),
-              );
-            },
+            onPressed: () => shareWithImage(
+              context: context,
+              text: '$sym — ${async.asData?.value.name ?? sym}\nhttps://stockmarketroi.com/stocks/${sym.toLowerCase()}',
+              imageUrl: 'https://assets.parqet.com/logos/symbol/$sym?format=png',
+              filename: '$sym.png',
+            ),
           ),
         ],
       ),
