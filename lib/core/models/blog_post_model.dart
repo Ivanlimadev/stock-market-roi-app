@@ -6,6 +6,7 @@ class BlogPost {
   final String? imageUrl;
   final String category;
   final String publishedAt;
+  final List<String>? tickers;
 
   const BlogPost({
     required this.slug,
@@ -15,6 +16,7 @@ class BlogPost {
     this.imageUrl,
     required this.category,
     required this.publishedAt,
+    this.tickers,
   });
 
   factory BlogPost.fromJson(Map<String, dynamic> j) => BlogPost(
@@ -25,5 +27,6 @@ class BlogPost {
     imageUrl:    j['image_url'] as String?,
     category:    j['category'] as String? ?? 'General',
     publishedAt: j['published_at'] as String? ?? '',
+    tickers:     (j['tickers'] as List?)?.map((e) => e as String).toList(),
   );
 }

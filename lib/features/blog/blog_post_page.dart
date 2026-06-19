@@ -8,13 +8,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/providers/blog_provider.dart';
+import '../../core/providers/stock_detail_provider.dart';
 
 // Busca o post completo pelo slug quando content não vem na navegação
 final _fullPostProvider = FutureProvider.autoDispose
     .family<BlogPost, String>((ref, slug) async {
   final data = await Supabase.instance.client
       .from('blog_posts')
-      .select('slug, title, excerpt, content, image_url, category, published_at')
+      .select('slug, title, excerpt, content, image_url, category, published_at, tickers')
       .eq('slug', slug)
       .single();
   return BlogPost.fromJson(data);
@@ -213,6 +214,12 @@ class _PostBody extends ConsumerWidget {
             styleSheet: mdSheet,
             data: mdContent,
           ),
+
+          // ── Card do ativo relacionado ─────────────────────────────────
+          if (post.tickers != null && post.tickers!.isNotEmpty) ...[
+            SizedBox(height: 32),
+            _TickerCard(ticker: post.tickers!.first),
+          ],
 
           SizedBox(height: 40),
           Divider(color: context.colors.surfaceAlt),
@@ -413,6 +420,211 @@ class _MoreArticles extends ConsumerWidget {
     );
   }
 }
+
+// ── Ticker Card ──────────────────────────────────────────────────────────────
+
+class _TickerCard extends ConsumerWidget {
+  final String ticker;
+  const _TickerCard({required this.ticker});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detailAsync = ref.watch(stockDetailProvider(ticker));
+    final historyAsync = ref.watch(stockHistoryProvider(ticker));
+    final c = context.colors;
+
+    return detailAsync.when(
+      loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (stock) {
+        double? change12m;
+        historyAsync.whenData((bars) {
+          if (bars.length >= 2) {
+            final first = bars.first.close;
+            final last  = bars.last.close;
+            if (first > 0) change12m = (last - first) / first * 100;
+          }
+        });
+
+        final info = stock.info;
+        final isUp = (change12m ?? 0) >= 0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Cabeçalho: logo + ticker + nome ──────────────────────
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        'https://assets.parqet.com/logos/symbol/$ticker?format=png',
+                        width: 56, height: 56, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 56, height: 56,
+                          decoration: BoxDecoration(
+                            color: c.surfaceAlt,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Text(ticker.substring(0, 1),
+                                style: TextStyle(fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: c.textPrimary)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(ticker,
+                              style: TextStyle(fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: c.textPrimary)),
+                          Text(stock.name,
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, color: c.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Métricas (fundo escuro) ───────────────────────────────
+              Container(
+                width: double.infinity,
+                color: const Color(0xFF0F1923),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                child: Column(
+                  children: [
+                    Row(children: [
+                      _MetricTile(
+                        label: 'Price',
+                        value: '\$${_fmt(stock.currentPrice)}',
+                      ),
+                      _MetricTile(
+                        label: 'Chg (12M)',
+                        value: change12m != null
+                            ? '${isUp ? '+' : ''}${change12m!.toStringAsFixed(2)}%'
+                            : '--',
+                        valueColor: change12m == null
+                            ? Colors.white
+                            : isUp ? AppColors.emerald : AppColors.red,
+                        trailing: change12m != null
+                            ? Icon(
+                                isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                size: 16,
+                                color: isUp ? AppColors.emerald : AppColors.red,
+                              )
+                            : null,
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      _MetricTile(
+                        label: 'Net Margin',
+                        value: info?.profitMargin != null
+                            ? '${(info!.profitMargin! * 100).toStringAsFixed(2)}%'
+                            : '--',
+                      ),
+                      _MetricTile(
+                        label: 'Div. Yield',
+                        value: info?.dividendYield != null
+                            ? '${(info!.dividendYield! * 100).toStringAsFixed(2)}%'
+                            : '--',
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      _MetricTile(
+                        label: 'P/E',
+                        value: info?.pe != null ? _fmt(info!.pe!) : '--',
+                      ),
+                      _MetricTile(
+                        label: 'P/B',
+                        value: info?.priceToBook != null ? _fmt(info!.priceToBook!) : '--',
+                      ),
+                    ]),
+                    const SizedBox(height: 20),
+                    OutlinedButton(
+                      onPressed: () => context.push('/stocks/$ticker'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: const BorderSide(color: Colors.white24),
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text('View all indicators ($ticker)'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _fmt(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v >= 1000)    return v.toStringAsFixed(0);
+    if (v >= 100)     return v.toStringAsFixed(1);
+    return v.toStringAsFixed(2);
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final Widget? trailing;
+  const _MetricTile({required this.label, required this.value,
+      this.valueColor, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF6B8BA4))),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: valueColor ?? Colors.white)),
+              if (trailing != null) ...[
+                const SizedBox(width: 4),
+                trailing!,
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _CatBadge extends StatelessWidget {
   final String category;
