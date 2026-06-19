@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/models/blog_post_model.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/providers/stock_detail_provider.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // Busca o post completo pelo slug quando content não vem na navegação
 final _fullPostProvider = FutureProvider.autoDispose
@@ -186,7 +187,14 @@ class _PostBody extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        toolbarHeight: 72,
+        title: Text(
+          post.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.share_rounded),
@@ -201,6 +209,7 @@ class _PostBody extends ConsumerWidget {
           ),
         ],
       ),
+      bottomNavigationBar: const AppBottomNav(),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
         children: [

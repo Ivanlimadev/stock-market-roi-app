@@ -16,6 +16,7 @@ import '../../core/providers/watchlist_provider.dart';
 import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
 import '../../core/widgets/app_footer.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ class StockDetailPage extends ConsumerWidget {
           ),
         ],
       ),
+      bottomNavigationBar: const AppBottomNav(),
       body: async.when(
         loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
         error: (e, _) => Center(
