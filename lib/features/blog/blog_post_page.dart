@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import '../../core/models/blog_post_model.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/providers/stock_detail_provider.dart';
 import '../../core/widgets/app_bottom_nav.dart';
+import '../../core/widgets/app_footer.dart';
 
 // Busca o post completo pelo slug quando content não vem na navegação
 final _fullPostProvider = FutureProvider.autoDispose
@@ -21,6 +23,13 @@ final _fullPostProvider = FutureProvider.autoDispose
       .single();
   return BlogPost.fromJson(data);
 });
+
+int _readingTime(String? content) {
+  if (content == null || content.isEmpty) return 1;
+  final words = content.trim().split(RegExp(r'\s+')).length;
+  final mins = (words / 200).ceil();
+  return mins < 1 ? 1 : mins;
+}
 
 const _catColors = {
   'Stocks':     Color(0xFF10B981),
@@ -49,107 +58,16 @@ class BlogPostPage extends ConsumerWidget {
         appBar: AppBar(),
         body: const Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => Scaffold(
+      error: (e, _) => Scaffold(
         appBar: AppBar(),
         body: const Center(child: Text('Erro ao carregar artigo')),
       ),
-      data: (full) => _PostBody(post: full),
+      data: (loaded) => _PostBody(post: loaded),
     );
   }
 }
 
-// ── Preview (sem conteúdo completo) ──────────────────────────────────────────
-
-class _PostPreview extends StatelessWidget {
-  final BlogPost post;
-  const _PostPreview({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    final catColor = _catColors[post.category] ?? AppColors.emerald;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (post.imageUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  post.imageUrl!,
-                  width: double.infinity, height: 200,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            SizedBox(height: 16),
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: catColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(post.category,
-                    style: TextStyle(fontSize: 11, color: catColor,
-                        fontWeight: FontWeight.w700)),
-              ),
-              SizedBox(width: 10),
-              Text(_timeAgo(post.publishedAt),
-                  style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
-            ]),
-            SizedBox(height: 14),
-            Text(post.title,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
-                    color: context.colors.textPrimary, height: 1.3)),
-            SizedBox(height: 16),
-            if (post.excerpt != null && post.excerpt!.isNotEmpty)
-              Text(post.excerpt!,
-                  style: TextStyle(fontSize: 15, color: context.colors.textSecond,
-                      height: 1.7)),
-            SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => launchUrl(
-                  Uri.parse('https://stockmarketroi.com/blog/${post.slug}'),
-                  mode: LaunchMode.externalApplication,
-                ),
-                icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                label: const Text('Read full article'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.emerald,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _timeAgo(String iso) {
-    try {
-      final dt   = DateTime.parse(iso).toLocal();
-      final diff = DateTime.now().difference(dt);
-      if (diff.inHours < 24)  return '${diff.inHours}h ago';
-      if (diff.inDays < 7)    return '${diff.inDays}d ago';
-      if (diff.inDays < 30)   return '${(diff.inDays / 7).floor()}w ago';
-      return '${(diff.inDays / 30).floor()}mo ago';
-    } catch (_) { return ''; }
-  }
-}
-
-// ── Leitor nativo completo ────────────────────────────────────────────────────
+// ── Post body ─────────────────────────────────────────────────────────────────
 
 class _PostBody extends ConsumerWidget {
   final BlogPost post;
@@ -166,7 +84,12 @@ class _PostBody extends ConsumerWidget {
       h3:              TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.textPrimary),
       strong:          TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary),
       em:              TextStyle(fontStyle: FontStyle.italic, color: context.colors.textSecond),
-      a:               TextStyle(color: AppColors.emerald, decoration: TextDecoration.underline),
+      a:               const TextStyle(
+        color: Color(0xFFF59E0B),
+        fontWeight: FontWeight.w600,
+        decoration: TextDecoration.underline,
+        decorationColor: Color(0xFFF59E0B),
+      ),
       blockquote:      TextStyle(fontSize: 14, color: context.colors.textMuted, fontStyle: FontStyle.italic),
       blockquoteDecoration: BoxDecoration(
         border: Border(left: BorderSide(color: AppColors.emerald, width: 3)),
@@ -221,12 +144,60 @@ class _PostBody extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
         children: [
+          // ── Título completo + metadados ───────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 20, 0, 12),
+            child: Text(
+              post.title,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: context.colors.textPrimary,
+                height: 1.3,
+              ),
+            ),
+          ),
+          Row(children: [
+            _CatBadge(category: post.category),
+            const SizedBox(width: 8),
+            Text(_timeAgo(post.publishedAt),
+                style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
+            const Spacer(),
+            Icon(Icons.schedule_rounded, size: 13, color: context.colors.textMuted),
+            const SizedBox(width: 3),
+            Text('${_readingTime(post.content)} min read',
+                style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
+          ]),
+          if (post.excerpt != null && post.excerpt!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
+              child: Text(
+                post.excerpt!,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: context.colors.textMuted,
+                  fontStyle: FontStyle.italic,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+
           // ── Conteúdo do post ─────────────────────────────────────────────
           MarkdownBody(
             selectable: true,
             onTapLink: (text, href, title) {
-              if (href != null) launchUrl(Uri.parse(href),
-                  mode: LaunchMode.externalApplication);
+              if (href == null) return;
+              final uri = Uri.tryParse(href);
+              if (uri == null) return;
+              final path = uri.path;
+              if (uri.host.isEmpty || uri.host.contains('stockmarketroi.com')) {
+                if (path.startsWith('/stocks/') || path.startsWith('/crypto/') || path.startsWith('/blog/')) {
+                  context.push(path);
+                  return;
+                }
+              }
+              launchUrl(uri, mode: LaunchMode.externalApplication);
             },
             styleSheet: mdSheet,
             data: mdContent,
@@ -234,18 +205,28 @@ class _PostBody extends ConsumerWidget {
 
           // ── Card do ativo relacionado ─────────────────────────────────
           if (post.tickers != null && post.tickers!.isNotEmpty) ...[
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
             _TickerCard(ticker: post.tickers!.first),
           ],
 
-          SizedBox(height: 40),
+          const SizedBox(height: 28),
+          _ShareRow(post: post),
+          const SizedBox(height: 14),
+          _TagsRow(post: post),
+
+          const SizedBox(height: 40),
           Divider(color: context.colors.surfaceAlt),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           // ── Mais artigos ─────────────────────────────────────────────────
           _MoreArticles(currentSlug: post.slug, category: post.category),
 
-          SizedBox(height: 32),
+          const SizedBox(height: 32),
+
+          // ── Footer ───────────────────────────────────────────────────────
+          const AppFooter(),
+
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -254,11 +235,6 @@ class _PostBody extends ConsumerWidget {
   String _buildMarkdown(BlogPost post, Color catColor) {
     final buf = StringBuffer();
     if (post.imageUrl != null) buf.writeln('![${post.title}](${post.imageUrl})\n');
-    buf.writeln('**${post.category}** · ${_timeAgo(post.publishedAt)}\n');
-    buf.writeln('# ${post.title}\n');
-    if (post.excerpt != null && post.excerpt!.isNotEmpty) {
-      buf.writeln('> ${post.excerpt}\n');
-    }
     if (post.content != null && post.content!.isNotEmpty) {
       buf.writeln(post.content);
     }
@@ -278,26 +254,37 @@ class _PostBody extends ConsumerWidget {
   }
 }
 
-// ── Mais Artigos ─────────────────────────────────────────────────────────────
+// ── Mais Artigos (com abas Related / Latest) ─────────────────────────────────
 
-class _MoreArticles extends ConsumerWidget {
+class _MoreArticles extends ConsumerStatefulWidget {
   final String currentSlug;
   final String category;
   const _MoreArticles({required this.currentSlug, required this.category});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MoreArticles> createState() => _MoreArticlesState();
+}
+
+class _MoreArticlesState extends ConsumerState<_MoreArticles> {
+  int _tab = 0; // 0 = Related, 1 = Latest
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(blogPostsProvider);
     final c = context.colors;
 
     return async.when(
       loading: () => const SizedBox.shrink(),
-      error:   (_, __) => const SizedBox.shrink(),
+      error:   (e, _) => const SizedBox.shrink(),
       data: (all) {
-        // Mesma categoria primeiro, depois outros; exclui o post atual
-        final same  = all.where((p) => p.slug != currentSlug && p.category == category).take(4).toList();
-        final other = all.where((p) => p.slug != currentSlug && p.category != category).toList();
-        final posts = [...same, ...other].take(4).toList();
+        List<BlogPost> posts;
+        if (_tab == 0) {
+          final same  = all.where((p) => p.slug != widget.currentSlug && p.category == widget.category).take(4).toList();
+          final other = all.where((p) => p.slug != widget.currentSlug && p.category != widget.category).toList();
+          posts = [...same, ...other].take(4).toList();
+        } else {
+          posts = all.where((p) => p.slug != widget.currentSlug).take(4).toList();
+        }
         if (posts.isEmpty) return const SizedBox.shrink();
 
         final featured = posts.first;
@@ -306,10 +293,21 @@ class _MoreArticles extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Related Articles',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
-                    color: c.textPrimary)),
-            SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('More Articles',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
+                          color: c.textPrimary)),
+                ),
+                _TabBtn(label: 'Related', selected: _tab == 0,
+                    onTap: () => setState(() => _tab = 0)),
+                const SizedBox(width: 6),
+                _TabBtn(label: 'Latest', selected: _tab == 1,
+                    onTap: () => setState(() => _tab = 1)),
+              ],
+            ),
+            const SizedBox(height: 16),
 
             // ── Featured (1º) com resumo ──────────────────────────────────
             GestureDetector(
@@ -329,7 +327,7 @@ class _MoreArticles extends ConsumerWidget {
                         featured.imageUrl!,
                         width: double.infinity, height: 160,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        errorBuilder: (ctx, err, _) => const SizedBox.shrink(),
                       ),
                     Padding(
                       padding: const EdgeInsets.all(14),
@@ -337,26 +335,26 @@ class _MoreArticles extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _CatBadge(category: featured.category),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(featured.title,
                               maxLines: 2, overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: c.textPrimary, height: 1.3)),
                           if (featured.excerpt != null && featured.excerpt!.isNotEmpty) ...[
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Text(featured.excerpt!,
                                 maxLines: 3, overflow: TextOverflow.ellipsis,
                                 style: TextStyle(fontSize: 13,
                                     color: c.textMuted, height: 1.5)),
                           ],
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Row(children: [
                             Text('Read article',
                                 style: TextStyle(fontSize: 12,
                                     color: AppColors.emerald,
                                     fontWeight: FontWeight.w600)),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Icon(Icons.arrow_forward_rounded,
                                 size: 13, color: AppColors.emerald),
                           ]),
@@ -368,7 +366,7 @@ class _MoreArticles extends ConsumerWidget {
               ),
             ),
 
-            SizedBox(height: 14),
+            const SizedBox(height: 14),
 
             // ── 3 cards com imagem + título ───────────────────────────────
             ...rest.map((p) => Padding(
@@ -385,14 +383,13 @@ class _MoreArticles extends ConsumerWidget {
                   clipBehavior: Clip.antiAlias,
                   child: Row(
                     children: [
-                      // Imagem
                       if (p.imageUrl != null)
                         SizedBox(
                           width: 88, height: 88,
                           child: Image.network(
                             p.imageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            errorBuilder: (ctx, err, _) => Container(
                               color: c.surfaceAlt,
                               child: Icon(Icons.article_outlined,
                                   size: 24, color: c.textMuted),
@@ -406,7 +403,6 @@ class _MoreArticles extends ConsumerWidget {
                           child: Icon(Icons.article_outlined,
                               size: 24, color: c.textMuted),
                         ),
-                      // Título
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -416,7 +412,7 @@ class _MoreArticles extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _CatBadge(category: p.category, small: true),
-                              SizedBox(height: 5),
+                              const SizedBox(height: 5),
                               Text(p.title,
                                   maxLines: 2, overflow: TextOverflow.ellipsis,
                                   style: TextStyle(fontSize: 13,
@@ -452,7 +448,7 @@ class _TickerCard extends ConsumerWidget {
 
     return detailAsync.when(
       loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
-      error:   (_, __) => const SizedBox.shrink(),
+      error:   (e, _) => const SizedBox.shrink(),
       data: (stock) {
         double? change12m;
         historyAsync.whenData((bars) {
@@ -486,7 +482,7 @@ class _TickerCard extends ConsumerWidget {
                       child: Image.network(
                         'https://assets.parqet.com/logos/symbol/$ticker?format=png',
                         width: 56, height: 56, fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (ctx, err, _) => Container(
                           width: 56, height: 56,
                           decoration: BoxDecoration(
                             color: c.surfaceAlt,
@@ -645,7 +641,199 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Share Row ─────────────────────────────────────────────────────────────────
+
+class _ShareRow extends StatelessWidget {
+  final BlogPost post;
+  const _ShareRow({required this.post});
+
+  String get _url => 'https://stockmarketroi.com/blog/${post.slug}';
+  String get _text => '${post.title}\n$_url';
+
+  Future<void> _open(String url) =>
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Share this article',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                color: c.textPrimary)),
+        const SizedBox(height: 10),
+        Row(children: [
+          _SocialBtn(
+            label: 'WhatsApp',
+            color: const Color(0xFF25D366),
+            icon: Icons.chat_bubble_rounded,
+            onTap: () => _open(
+                'https://wa.me/?text=${Uri.encodeComponent(_text)}'),
+          ),
+          const SizedBox(width: 8),
+          _SocialBtn(
+            label: 'Telegram',
+            color: const Color(0xFF0088CC),
+            icon: Icons.near_me_rounded,
+            onTap: () => _open(
+                'https://t.me/share/url?url=${Uri.encodeComponent(_url)}&text=${Uri.encodeComponent(post.title)}'),
+          ),
+          const SizedBox(width: 8),
+          _SocialBtn(
+            label: 'Twitter/X',
+            color: const Color(0xFF9CA3AF),
+            symbol: 'X',
+            onTap: () => _open(
+                'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(_text)}'),
+          ),
+          const SizedBox(width: 8),
+          _SocialBtn(
+            label: 'Copy Link',
+            color: AppColors.emerald,
+            icon: Icons.link_rounded,
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: _url));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Link copied!'),
+                    duration: Duration(seconds: 2)),
+              );
+            },
+          ),
+        ]),
+      ],
+    );
+  }
+}
+
+class _SocialBtn extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData? icon;
+  final String? symbol;
+  final VoidCallback onTap;
+  const _SocialBtn({
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.icon,
+    this.symbol,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null)
+                Icon(icon!, size: 18, color: color)
+              else
+                Text(symbol!,
+                    style: TextStyle(fontSize: 16, color: color,
+                        fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(label,
+                  style: TextStyle(fontSize: 9, color: color,
+                      fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tags Row ─────────────────────────────────────────────────────────────────
+
+class _TagsRow extends StatelessWidget {
+  final BlogPost post;
+  const _TagsRow({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final tickers = post.tickers ?? [];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _TagChip(
+          label: '#${post.category}',
+          color: _catColors[post.category] ?? AppColors.emerald,
+        ),
+        ...tickers.map((t) => GestureDetector(
+          onTap: () => context.push('/stocks/$t'),
+          child: _TagChip(label: '\$$t', color: const Color(0xFFF59E0B)),
+        )),
+      ],
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _TagChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(label,
+          style: TextStyle(fontSize: 12, color: color,
+              fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+// ── Tab Button ───────────────────────────────────────────────────────────────
+
+class _TabBtn extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _TabBtn({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.emerald : context.colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : context.colors.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Category Badge ────────────────────────────────────────────────────────────
 
 class _CatBadge extends StatelessWidget {
   final String category;

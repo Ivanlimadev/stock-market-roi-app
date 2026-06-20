@@ -14,9 +14,10 @@ class _RegisterPageState extends State<RegisterPage> {
   final _name     = TextEditingController();
   final _email    = TextEditingController();
   final _password = TextEditingController();
-  bool _loading   = false;
-  bool _showPw    = false;
-  bool _done      = false;
+  bool _loading         = false;
+  bool _showPw          = false;
+  bool _done            = false;
+  bool _emailSubscribed = true;
   String? _error;
 
   Future<void> _register() async {
@@ -29,7 +30,7 @@ class _RegisterPageState extends State<RegisterPage> {
       await Supabase.instance.client.auth.signUp(
         email: _email.text.trim(),
         password: _password.text,
-        data: {'name': _name.text.trim()},
+        data: {'name': _name.text.trim(), 'email_subscribed': _emailSubscribed},
         emailRedirectTo: 'https://stockmarketroi.com/auth/confirm',
       );
       if (mounted) setState(() => _done = true);
@@ -147,7 +148,37 @@ class _RegisterPageState extends State<RegisterPage> {
                 SizedBox(height: 12),
                 Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
               ],
-              SizedBox(height: 24),
+              SizedBox(height: 20),
+              GestureDetector(
+                onTap: () => setState(() => _emailSubscribed = !_emailSubscribed),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: Checkbox(
+                        value: _emailSubscribed,
+                        onChanged: (v) => setState(() => _emailSubscribed = v ?? false),
+                        activeColor: AppColors.emerald,
+                        checkColor: Colors.black,
+                        side: BorderSide(color: context.colors.textMuted, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Send me email updates about new articles and stock reports — links go to the website, not the app.',
+                        style: TextStyle(fontSize: 13, color: context.colors.textMuted, height: 1.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 20),
               FilledButton(
                 onPressed: _loading ? null : _register,
                 style: FilledButton.styleFrom(
