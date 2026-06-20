@@ -108,6 +108,16 @@ final watchlistSymbolsProvider = Provider.autoDispose<Set<String>>((ref) =>
       orElse: () => {},
     ));
 
+/// Set of symbols that have at least one active (non-triggered) price alert.
+final alertSymbolsProvider = Provider.autoDispose<Set<String>>((ref) =>
+    ref.watch(alertsProvider).maybeWhen(
+      data: (alerts) => alerts
+          .where((a) => !a.triggered)
+          .map((a) => a.symbol)
+          .toSet(),
+      orElse: () => {},
+    ));
+
 /// Set of coingecko IDs currently in the watchlist (for crypto).
 final watchlistCryptoIdsProvider = Provider.autoDispose<Set<String>>((ref) =>
     ref.watch(watchlistProvider).maybeWhen(

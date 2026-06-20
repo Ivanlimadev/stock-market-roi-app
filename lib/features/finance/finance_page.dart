@@ -88,7 +88,15 @@ class _FinancePageState extends ConsumerState<FinancePage>
     return Scaffold(
       appBar: AppBar(
         title: Text('Finance'),
-        actions: [MainShellMenu.themeButton(), MainShellMenu.button()],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.public_rounded),
+            tooltip: 'US Economy',
+            onPressed: () => context.push('/us-macro'),
+          ),
+          MainShellMenu.themeButton(),
+          MainShellMenu.button(),
+        ],
         bottom: TabBar(
           controller: _tab,
           indicatorColor: AppColors.emerald,

@@ -16,6 +16,7 @@ import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
 import '../../core/widgets/app_footer.dart';
 import '../../core/widgets/app_bottom_nav.dart';
+import '../../core/widgets/auth_prompt_sheet.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
@@ -164,6 +165,8 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
   Widget build(BuildContext context) {
     final async       = ref.watch(cryptoDetailProvider(widget.coinId));
     final inWatchlist = ref.watch(watchlistCryptoIdsProvider).contains(widget.coinId);
+    final cryptoSym   = async.asData?.value.symbol.toUpperCase() ?? '';
+    final hasAlert    = ref.watch(alertSymbolsProvider).contains(cryptoSym);
     final isLoggedIn  = Supabase.instance.client.auth.currentUser != null;
 
     return Scaffold(
@@ -172,45 +175,56 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
           widget.coinId[0].toUpperCase() + widget.coinId.substring(1),
         ),
         actions: [
-          if (isLoggedIn) ...[
-            IconButton(
-              icon: Icon(
-                inWatchlist ? Icons.star_rounded : Icons.star_border_rounded,
-                color: inWatchlist ? const Color(0xFFF59E0B) : null,
-              ),
-              tooltip: inWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
-              onPressed: () async {
-                if (inWatchlist) {
-                  await WatchlistService.removeCrypto(widget.coinId);
-                } else {
-                  final detail = async.asData?.value;
-                  await WatchlistService.addCrypto(
-                    coinId: widget.coinId,
-                    symbol: detail?.symbol.toUpperCase() ?? widget.coinId.toUpperCase(),
-                    name:   detail?.name ?? widget.coinId,
-                    image:  detail?.image,
-                  );
-                }
-              },
+          // Favorite — always visible; prompts auth if not logged in
+          IconButton(
+            icon: Icon(
+              inWatchlist ? Icons.star_rounded : Icons.star_border_rounded,
+              color: inWatchlist ? AppColors.emerald : null,
             ),
-            IconButton(
-              icon: const Icon(Icons.notifications_none_rounded),
-              tooltip: 'Set price alert',
-              onPressed: () {
+            tooltip: inWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+            onPressed: () async {
+              if (!isLoggedIn) {
+                showAuthPromptSheet(context, action: 'favorite this asset');
+                return;
+              }
+              if (inWatchlist) {
+                await WatchlistService.removeCrypto(widget.coinId);
+              } else {
                 final detail = async.asData?.value;
-                if (detail == null) return;
-                showAddAlertDialog(
-                  context,
-                  symbol:      detail.symbol.toUpperCase(),
-                  name:        detail.name,
-                  currentPrice: detail.marketData.currentPrice,
-                  assetType:   'crypto',
-                  coingeckoId: widget.coinId,
-                  image:       detail.image,
+                await WatchlistService.addCrypto(
+                  coinId: widget.coinId,
+                  symbol: detail?.symbol.toUpperCase() ?? widget.coinId.toUpperCase(),
+                  name:   detail?.name ?? widget.coinId,
+                  image:  detail?.image,
                 );
-              },
+              }
+            },
+          ),
+          // Price alert — yellow when active alert exists
+          IconButton(
+            icon: Icon(
+              hasAlert ? Icons.notifications_rounded : Icons.notifications_none_rounded,
+              color: hasAlert ? const Color(0xFFF59E0B) : null,
             ),
-          ],
+            tooltip: 'Set price alert',
+            onPressed: () {
+              if (!isLoggedIn) {
+                showAuthPromptSheet(context, action: 'set price alerts');
+                return;
+              }
+              final detail = async.asData?.value;
+              if (detail == null) return;
+              showAddAlertDialog(
+                context,
+                symbol:      detail.symbol.toUpperCase(),
+                name:        detail.name,
+                currentPrice: detail.marketData.currentPrice,
+                assetType:   'crypto',
+                coingeckoId: widget.coinId,
+                image:       detail.image,
+              );
+            },
+          ),
           IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
           IconButton(
             icon: const Icon(Icons.open_in_new),

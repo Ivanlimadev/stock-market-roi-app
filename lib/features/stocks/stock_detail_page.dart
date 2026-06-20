@@ -18,6 +18,7 @@ import '../../core/providers/financials_provider.dart';
 import '../../core/utils/share_utils.dart';
 import '../../core/widgets/app_footer.dart';
 import '../../core/widgets/app_bottom_nav.dart';
+import '../../core/widgets/auth_prompt_sheet.dart';
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -30,52 +31,58 @@ class StockDetailPage extends ConsumerWidget {
     final sym          = symbol.toUpperCase();
     final async        = ref.watch(stockDetailProvider(sym));
     final inWatchlist  = ref.watch(watchlistSymbolsProvider).contains(sym);
+    final hasAlert     = ref.watch(alertSymbolsProvider).contains(sym);
     final isLoggedIn   = Supabase.instance.client.auth.currentUser != null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(sym),
         actions: [
-          if (isLoggedIn) ...[
-            IconButton(
-              icon: Icon(
-                inWatchlist ? Icons.star_rounded : Icons.star_border_rounded,
-                color: inWatchlist ? const Color(0xFFF59E0B) : null,
-              ),
-              tooltip: inWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
-              onPressed: () async {
-                if (inWatchlist) {
-                  await WatchlistService.removeStock(sym);
-                } else {
-                  final name = async.asData?.value.name ?? sym;
-                  await WatchlistService.addStock(symbol: sym, name: name);
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.notifications_none_rounded),
-              tooltip: 'Set price alert',
-              onPressed: () {
-                final price = async.asData?.value.currentPrice;
-                if (price == null) return;
-                final name = async.asData?.value.name ?? sym;
-                showAddAlertDialog(
-                  context,
-                  symbol: sym,
-                  name: name,
-                  currentPrice: price,
-                  assetType: 'stock',
-                );
-              },
-            ),
-          ],
+          // Favorite — always visible; prompts auth if not logged in
           IconButton(
-            icon: Icon(Icons.refresh_rounded),
-            onPressed: () {
-              ref.invalidate(stockDetailProvider(sym));
-              ref.invalidate(stockHistoryProvider(sym));
+            icon: Icon(
+              inWatchlist ? Icons.star_rounded : Icons.star_border_rounded,
+              color: inWatchlist ? AppColors.emerald : null,
+            ),
+            tooltip: inWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+            onPressed: () async {
+              if (!isLoggedIn) {
+                showAuthPromptSheet(context, action: 'favorite this asset');
+                return;
+              }
+              if (inWatchlist) {
+                await WatchlistService.removeStock(sym);
+              } else {
+                final name = async.asData?.value.name ?? sym;
+                await WatchlistService.addStock(symbol: sym, name: name);
+              }
             },
           ),
+          // Price alert — always visible; yellow when active alert exists
+          IconButton(
+            icon: Icon(
+              hasAlert ? Icons.notifications_rounded : Icons.notifications_none_rounded,
+              color: hasAlert ? const Color(0xFFF59E0B) : null,
+            ),
+            tooltip: 'Set price alert',
+            onPressed: () {
+              if (!isLoggedIn) {
+                showAuthPromptSheet(context, action: 'set price alerts');
+                return;
+              }
+              final price = async.asData?.value.currentPrice;
+              if (price == null) return;
+              final name = async.asData?.value.name ?? sym;
+              showAddAlertDialog(
+                context,
+                symbol: sym,
+                name: name,
+                currentPrice: price,
+                assetType: 'stock',
+              );
+            },
+          ),
+
           Builder(
             builder: (btnCtx) => IconButton(
               icon: const Icon(Icons.share_rounded),
