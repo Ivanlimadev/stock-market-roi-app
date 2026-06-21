@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/theme_provider.dart';
+import '../../core/providers/profile_provider.dart';
 
 /// Account hub: everything related to the user account, notifications,
 /// support and the destructive sign-out / delete-account actions.
@@ -47,7 +48,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'This will permanently delete your account, watchlist, portfolio and all data. This action cannot be undone.',
+                'This permanently deletes your account and all data — watchlist, portfolio, alerts and profile — across the app and the website. This action cannot be undone.',
                 style: TextStyle(fontSize: 13, color: c.textSecond, height: 1.4),
               ),
               const SizedBox(height: 16),
@@ -104,6 +105,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     setState(() => _loading = true);
     try {
+      // Storage files don't cascade with the auth user — remove the avatar
+      // explicitly before deleting the account (delete_user wipes the rest).
+      await ProfileService.removeAvatar();
       await Supabase.instance.client.rpc('delete_user');
       await Supabase.instance.client.auth.signOut();
       if (mounted) context.go('/home');
@@ -118,10 +122,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  Future<void> _support() => launchUrl(
-        Uri.parse('mailto:contato@stockmarketroi.com'),
-        mode: LaunchMode.externalApplication,
-      );
+  Future<void> _support() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    // Encode manually so spaces become %20 (some mail clients choke on '+').
+    String enc(Map<String, String> p) => p.entries
+        .map((e) =>
+            '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    final uri = Uri.parse(
+      'mailto:contato@stockmarketroi.com?${enc({
+            'subject': 'Stock Market ROI — Support',
+            'body': 'Describe your issue here.\n\n'
+                '——\nAccount: ${user?.email ?? 'guest'}\n'
+                'User ID: ${user?.id ?? '—'}\n'
+                'App: Stock Market ROI',
+          })}',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +167,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
-            _UserStrip(user: user),
+            const _UserStrip(),
             Divider(color: context.colors.surfaceAlt, height: 1),
 
             if (user != null) ...[
@@ -162,8 +180,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               _Item(
                 icon: Icons.notifications_rounded,
                 label: 'Notifications',
-                badge: 'Coming soon',
-                onTap: () {},
+                onTap: () => context.push('/settings/notifications'),
               ),
             ],
 
@@ -237,13 +254,118 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
 // ── User strip ──────────────────────────────────────────────────────────────
 
-class _UserStrip extends StatelessWidget {
-  final User? user;
-  const _UserStrip({required this.user});
+class _UserStrip extends ConsumerStatefulWidget {
+  const _UserStrip();
+
+  @override
+  ConsumerState<_UserStrip> createState() => _UserStripState();
+}
+
+class _UserStripState extends ConsumerState<_UserStrip> {
+  bool _busy = false;
+
+  Future<void> _changePhoto() async {
+    setState(() => _busy = true);
+    try {
+      final ok = await ProfileService.pickAndUploadAvatar();
+      if (ok) ref.invalidate(profileProvider);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not update photo.')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() => _busy = true);
+    try {
+      await ProfileService.removeAvatar();
+      ref.invalidate(profileProvider);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _editName(String? current) async {
+    final ctrl = TextEditingController(text: current ?? '');
+    final c = context.colors;
+    final name = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Display name', style: TextStyle(fontSize: 16)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          style: TextStyle(color: c.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Your name',
+            hintStyle: TextStyle(color: c.textMuted),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: c.border)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.emerald)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: c.textMuted))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.emerald, foregroundColor: Colors.white),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name == null) return;
+    await ProfileService.updateDisplayName(name);
+    ref.invalidate(profileProvider);
+  }
+
+  void _showActions(UserProfile? profile) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_rounded),
+            title: const Text('Change photo'),
+            onTap: () { Navigator.pop(ctx); _changePhoto(); },
+          ),
+          if (profile?.avatarUrl != null)
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded),
+              title: const Text('Remove photo'),
+              onTap: () { Navigator.pop(ctx); _removePhoto(); },
+            ),
+          ListTile(
+            leading: const Icon(Icons.edit_rounded),
+            title: const Text('Edit display name'),
+            onTap: () { Navigator.pop(ctx); _editName(profile?.displayName); },
+          ),
+        ]),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final user = Supabase.instance.client.auth.currentUser;
+
     if (user == null) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -255,8 +377,7 @@ class _UserStrip extends StatelessWidget {
               color: c.surfaceAlt,
               borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(Icons.person_outline_rounded,
-                size: 22, color: c.textMuted),
+            child: Icon(Icons.person_outline_rounded, size: 22, color: c.textMuted),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -284,44 +405,90 @@ class _UserStrip extends StatelessWidget {
       );
     }
 
-    final email = user!.email ?? '';
+    final profile = ref.watch(profileProvider).valueOrNull;
+    final email = user.email ?? '';
     final initials = email.isNotEmpty ? email[0].toUpperCase() : 'U';
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.emerald.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(22),
+    final avatarUrl = profile?.avatarUrl;
+    final name = (profile?.displayName?.isNotEmpty ?? false)
+        ? profile!.displayName!
+        : 'My Account';
+
+    return InkWell(
+      onTap: () => _showActions(profile),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(children: [
+          Stack(children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: AppColors.emerald.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(26),
+                image: avatarUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(avatarUrl), fit: BoxFit.cover)
+                    : null,
+              ),
+              child: avatarUrl == null
+                  ? Center(
+                      child: Text(initials,
+                          style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.emerald)))
+                  : null,
+            ),
+            if (_busy)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(26)),
+                  child: const Center(
+                      child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))),
+                ),
+              ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.emerald,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: c.background, width: 2),
+                ),
+                child: const Icon(Icons.photo_camera_rounded,
+                    size: 11, color: Colors.white),
+              ),
+            ),
+          ]),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: c.textPrimary)),
+                const SizedBox(height: 2),
+                Text(email,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: c.textMuted)),
+              ],
+            ),
           ),
-          child: Center(
-            child: Text(initials,
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.emerald)),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('My Account',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: c.textPrimary)),
-              const SizedBox(height: 2),
-              Text(email,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: c.textMuted)),
-            ],
-          ),
-        ),
-      ]),
+          Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+        ]),
+      ),
     );
   }
 }
@@ -349,14 +516,12 @@ class _Section extends StatelessWidget {
 class _Item extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String? badge;
   final VoidCallback onTap;
 
   const _Item({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.badge,
   });
 
   @override
@@ -384,21 +549,7 @@ class _Item extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: c.textPrimary)),
           ),
-          if (badge != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: c.surfaceAlt,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(badge!,
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: c.textMuted)),
-            )
-          else
-            Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+          Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
         ]),
       ),
     );

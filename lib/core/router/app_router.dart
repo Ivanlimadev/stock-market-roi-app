@@ -30,6 +30,7 @@ import '../../features/compare/compare_page.dart';
 import '../../features/editorial/editorial_rankings_page.dart';
 import '../../features/finance/us_macro_page.dart';
 import '../../features/settings/settings_page.dart';
+import '../../features/settings/notifications_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
@@ -55,6 +56,7 @@ final appRouter = GoRouter(
 
     // Settings — outside shell (full screen, back button)
     GoRoute(path: '/settings',  builder: (_, $) => const SettingsPage()),
+    GoRoute(path: '/settings/notifications', builder: (_, $) => const NotificationsPage()),
 
     // My Account — outside shell (avoids a 2nd MainShell / duplicate scaffoldKey
     // when pushed on top of a shell route from Settings)
