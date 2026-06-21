@@ -62,6 +62,9 @@ final appRouter = GoRouter(
     // when pushed on top of a shell route from Settings)
     GoRoute(path: '/perfil',    builder: (_, $) => const PerfilPage()),
 
+    // Crypto — outside shell so it can be pushed from the Menu with a back button
+    GoRoute(path: '/crypto',    builder: (_, $) => const CryptoPage()),
+
     // Watchlist — outside shell (full screen, back button)
     GoRoute(path: '/watchlist', builder: (_, $) => const WatchlistPage()),
 
@@ -136,7 +139,6 @@ final appRouter = GoRouter(
         GoRoute(path: '/finance',   builder: (_, $) => const FinancePage()),
         GoRoute(path: '/portfolio', builder: (_, $) => const PortfolioPage()),
         GoRoute(path: '/news',      builder: (_, $) => const NewsPage()),
-        GoRoute(path: '/crypto',    builder: (_, $) => const CryptoPage()),
         GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
       ],
     ),

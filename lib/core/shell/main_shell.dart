@@ -119,7 +119,7 @@ class _MainShellState extends State<MainShell> {
                       label: 'Crypto',
                       onTap: () {
                         Navigator.of(context).pop();
-                        context.go('/crypto');
+                        context.push('/crypto');
                       },
                     ),
                     const SizedBox(height: 8),

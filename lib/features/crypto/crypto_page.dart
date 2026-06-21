@@ -43,6 +43,12 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
           slivers: [
             SliverAppBar(
               pinned: true,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'Back',
+                onPressed: () =>
+                    context.canPop() ? context.pop() : context.go('/home'),
+              ),
               title: Text('Crypto Market'),
               actions: [
                 IconButton(
