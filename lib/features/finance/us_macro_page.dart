@@ -13,6 +13,14 @@ import '../../core/shell/main_shell.dart';
 class UsMacroPage extends ConsumerWidget {
   const UsMacroPage({super.key});
 
+  Future<void> _refreshAll(WidgetRef ref) async {
+    // Invalidate every detail card (whole family) plus the overview, then
+    // await the overview so the refresh spinner reflects real reload work.
+    ref.invalidate(macroDetailProvider);
+    ref.invalidate(macroUsProvider);
+    await ref.read(macroUsProvider.future);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(macroUsProvider);
@@ -22,7 +30,7 @@ class UsMacroPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(macroUsProvider),
+            onPressed: () => _refreshAll(ref),
           ),
           MainShellMenu.themeButton(),
           MainShellMenu.button(),
@@ -35,7 +43,10 @@ class UsMacroPage extends ConsumerWidget {
           message: 'Macro data unavailable',
           onRetry: () => ref.invalidate(macroUsProvider),
         ),
-        data: (indicators) => _MacroBody(indicators: indicators),
+        data: (indicators) => _MacroBody(
+          indicators: indicators,
+          onRefresh: () => _refreshAll(ref),
+        ),
       ),
     );
   }
@@ -45,7 +56,8 @@ class UsMacroPage extends ConsumerWidget {
 
 class _MacroBody extends StatelessWidget {
   final List<MacroIndicator> indicators;
-  const _MacroBody({required this.indicators});
+  final Future<void> Function() onRefresh;
+  const _MacroBody({required this.indicators, required this.onRefresh});
 
   static const _order = [
     'fed', 'labor', 'inflation', 'growth', 'consumer',
@@ -88,17 +100,23 @@ class _MacroBody extends StatelessWidget {
     }
     items.addAll(['_credit', '_spacer']);
 
-    return ListView.builder(
-      itemCount: items.length,
-      itemBuilder: (context, i) {
-        final item = items[i];
-        if (item == '_scorecard') return _MacroScorecard(indicators: indicators);
-        if (item == '_fomc')      return _FomcCalendar(fedFunds: fed);
-        if (item == '_credit')    return const _FredCredit();
-        if (item == '_spacer')    return const SizedBox(height: 32);
-        if (item is String)       return _SectionHeader(label: _labels[item] ?? item.toUpperCase());
-        return _FullIndicatorCard(indicator: item as MacroIndicator);
-      },
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: AppColors.emerald,
+      child: ListView.builder(
+        // AlwaysScrollable so pull-to-refresh works even when content is short.
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          if (item == '_scorecard') return _MacroScorecard(indicators: indicators);
+          if (item == '_fomc')      return _FomcCalendar(fedFunds: fed);
+          if (item == '_credit')    return const _FredCredit();
+          if (item == '_spacer')    return const SizedBox(height: 32);
+          if (item is String)       return _SectionHeader(label: _labels[item] ?? item.toUpperCase());
+          return _FullIndicatorCard(indicator: item as MacroIndicator);
+        },
+      ),
     );
   }
 }
@@ -283,7 +301,9 @@ class _FomcCalendar extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final upcoming = _meetings.where((m) => m.$1.isAfter(now)).toList();
-    if (upcoming.isEmpty) return const SizedBox.shrink();
+    // Hardcoded schedule exhausted → show an honest placeholder instead of
+    // silently vanishing (and never fabricate unconfirmed FOMC dates).
+    if (upcoming.isEmpty) return const _FomcOutdated();
 
     final next     = upcoming.first;
     final daysLeft = next.$1.difference(now).inDays + 1;
@@ -369,6 +389,26 @@ class _FomcCalendar extends StatelessWidget {
       ]),
     );
   }
+}
+
+class _FomcOutdated extends StatelessWidget {
+  const _FomcOutdated();
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(children: [
+      const Icon(Icons.event_busy_rounded, size: 16, color: AppColors.emerald),
+      const SizedBox(width: 10),
+      Expanded(child: Text(
+        'Calendário FOMC será atualizado com as próximas datas.',
+        style: TextStyle(fontSize: 12, color: context.colors.textMuted))),
+    ]),
+  );
 }
 
 // ── Section Header ────────────────────────────────────────────────────────────
@@ -610,22 +650,10 @@ class _MacroChart extends StatelessWidget {
         topTitles: const AxisTitles(
           sideTitles: SideTitles(showTitles: false)),
       ),
-      lineTouchData: LineTouchData(
-        touchTooltipData: LineTouchTooltipData(
-          getTooltipColor: (_) => context.colors.surface,
-          tooltipBorder: BorderSide(color: context.colors.surfaceAlt),
-          getTooltipItems: (spots) => spots.map((s) {
-            if (s.barIndex != recBands.length) return null;
-            final idx = s.x.round();
-            if (idx < 0 || idx >= filtered.length) return null;
-            return LineTooltipItem(
-              '${_longDate(filtered[idx].date)}\n${_fmtValue(s.y, detail.unit)}',
-              TextStyle(color: lineColor,
-                fontWeight: FontWeight.w700, fontSize: 12),
-            );
-          }).toList(),
-        ),
-      ),
+      // Touch disabled: these charts live inside a scrolling ListView, so the
+      // chart must not capture vertical drags (it would block page scroll).
+      // Exact values are available in the history table below each card.
+      lineTouchData: const LineTouchData(enabled: false),
       lineBarsData: [
         ...recBands,
         LineChartBarData(
@@ -908,8 +936,7 @@ String _fmtChange(double c, String unit) {
     case 'idx': return '$s${c.toStringAsFixed(1)}';
     case '\$': {
       final sign = c >= 0 ? '+' : '-';
-      final a = c.abs();
-      return '$sign\$${a.toStringAsFixed(a >= 10 ? 2 : 2)}';
+      return '$sign\$${c.abs().toStringAsFixed(2)}';
     }
     default:    return '$s${c.toStringAsFixed(2)}';
   }
