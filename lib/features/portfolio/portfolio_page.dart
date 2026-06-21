@@ -90,7 +90,6 @@ class _LoggedInPortfolioState extends ConsumerState<_LoggedInPortfolio>
             onPressed: _refresh,
           ),
           MainShellMenu.themeButton(),
-          MainShellMenu.button(),
         ],
         bottom: TabBar(
           controller: _tab,
@@ -1065,9 +1064,7 @@ class _GuestPortfolio extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          title: Text('Portfolio'),
-          actions: [MainShellMenu.button()]),
+      appBar: AppBar(title: Text('Portfolio')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),

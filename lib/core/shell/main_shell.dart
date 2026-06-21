@@ -44,12 +44,13 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   final _scaffoldKey = MainShellMenu.scaffoldKey;
 
+  // Real navigation destinations. The bottom bar appends a "Menu" launcher
+  // after these that opens the end drawer instead of navigating.
   static const _tabs = [
-    _Tab(icon: Icons.home_rounded,                    label: 'Home',     path: '/home'),
-    _Tab(icon: Icons.account_balance_outlined,        label: 'Finance',  path: '/finance'),
+    _Tab(icon: Icons.home_rounded,                    label: 'Home',      path: '/home'),
+    _Tab(icon: Icons.account_balance_outlined,        label: 'Finance',   path: '/finance'),
     _Tab(icon: Icons.account_balance_wallet_rounded,  label: 'Portfolio', path: '/portfolio'),
-    _Tab(icon: Icons.newspaper_rounded,               label: 'News',     path: '/news'),
-    _Tab(icon: Icons.currency_bitcoin,                label: 'Crypto',   path: '/crypto'),
+    _Tab(icon: Icons.newspaper_rounded,               label: 'News',      path: '/news'),
   ];
 
   int _currentIndex(BuildContext context) {
@@ -59,7 +60,14 @@ class _MainShellState extends State<MainShell> {
     return idx < 0 ? 0 : idx;
   }
 
-  void _onTap(int index) => context.go(_tabs[index].path);
+  void _onTap(int index) {
+    // The trailing item is the Menu launcher → open the end drawer.
+    if (index >= _tabs.length) {
+      MainShellMenu.open();
+      return;
+    }
+    context.go(_tabs[index].path);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +111,16 @@ class _MainShellState extends State<MainShell> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
+                    _DrawerSection('Markets'),
+                    _DrawerItem(
+                      icon: Icons.currency_bitcoin,
+                      label: 'Crypto',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.go('/crypto');
+                      },
+                    ),
+                    const SizedBox(height: 8),
                     _DrawerSection('Account'),
                     _DrawerItem(
                       icon: Icons.person_rounded,
@@ -216,9 +234,12 @@ class _MainShellState extends State<MainShell> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex(context),
           onTap: _onTap,
-          items: _tabs
-              .map((t) => BottomNavigationBarItem(icon: Icon(t.icon), label: t.label))
-              .toList(),
+          items: [
+            ..._tabs.map((t) =>
+                BottomNavigationBarItem(icon: Icon(t.icon), label: t.label)),
+            const BottomNavigationBarItem(
+                icon: Icon(Icons.menu_rounded), label: 'Menu'),
+          ],
         ),
       ),
     );

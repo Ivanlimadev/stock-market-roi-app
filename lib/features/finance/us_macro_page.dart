@@ -33,7 +33,6 @@ class UsMacroPage extends ConsumerWidget {
             onPressed: () => _refreshAll(ref),
           ),
           MainShellMenu.themeButton(),
-          MainShellMenu.button(),
         ],
       ),
       body: async.when(
