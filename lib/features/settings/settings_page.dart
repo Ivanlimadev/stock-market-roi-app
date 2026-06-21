@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/providers/profile_provider.dart';
+
+final _appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return '${info.version} (${info.buildNumber})';
+});
+
+Future<void> _openUrl(String url) =>
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 
 /// Account hub: everything related to the user account, notifications,
 /// support and the destructive sign-out / delete-account actions.
@@ -141,6 +150,116 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _changePassword() async {
+    final c = context.colors;
+    final pwd = TextEditingController();
+    final confirm = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final valid = pwd.text.length >= 6 && pwd.text == confirm.text;
+          InputDecoration dec(String hint) => InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: c.textMuted),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: c.border)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.emerald)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              );
+          return AlertDialog(
+            backgroundColor: c.background,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Change password', style: TextStyle(fontSize: 16)),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                controller: pwd,
+                obscureText: true,
+                onChanged: (_) => setS(() {}),
+                style: TextStyle(color: c.textPrimary),
+                decoration: dec('New password (min. 6)'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: confirm,
+                obscureText: true,
+                onChanged: (_) => setS(() {}),
+                style: TextStyle(color: c.textPrimary),
+                decoration: dec('Confirm new password'),
+              ),
+            ]),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: TextStyle(color: c.textMuted))),
+              FilledButton(
+                onPressed: valid ? () => Navigator.pop(ctx, true) : null,
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.emerald,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor:
+                        AppColors.emerald.withValues(alpha: 0.3)),
+                child: const Text('Update'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+    try {
+      await Supabase.instance.client.auth
+          .updateUser(UserAttributes(password: pwd.text));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password updated.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not update password.')));
+      }
+    }
+  }
+
+  void _pickTheme() {
+    final current = ref.read(themeProvider);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final m in ThemeMode.values)
+            ListTile(
+              title: Text(_themeLabel(m)),
+              trailing: m == current
+                  ? const Icon(Icons.check_rounded, color: AppColors.emerald)
+                  : null,
+              onTap: () {
+                ref.read(themeProvider.notifier).state = m;
+                Navigator.pop(ctx);
+              },
+            ),
+        ]),
+      ),
+    );
+  }
+
+  static String _themeLabel(ThemeMode m) => switch (m) {
+        ThemeMode.system => 'System',
+        ThemeMode.light => 'Light',
+        ThemeMode.dark => 'Dark',
+      };
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -182,7 +301,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 label: 'Notifications',
                 onTap: () => context.push('/settings/notifications'),
               ),
+              _Item(
+                icon: Icons.lock_rounded,
+                label: 'Change password',
+                onTap: _changePassword,
+              ),
             ],
+
+            const SizedBox(height: 8),
+            const _Section('Appearance'),
+            Consumer(builder: (context, ref, _) {
+              final mode = ref.watch(themeProvider);
+              return _Item(
+                icon: Icons.palette_rounded,
+                label: 'Theme',
+                trailing: _themeLabel(mode),
+                onTap: _pickTheme,
+              );
+            }),
 
             const SizedBox(height: 8),
             const _Section('Help'),
@@ -191,6 +327,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               label: 'Support',
               onTap: _support,
             ),
+
+            const SizedBox(height: 8),
+            const _Section('Legal'),
+            _Item(
+              icon: Icons.privacy_tip_rounded,
+              label: 'Privacy Policy',
+              onTap: () => _openUrl('https://stockmarketroi.com/privacy'),
+            ),
+            _Item(
+              icon: Icons.description_rounded,
+              label: 'Terms of Service',
+              onTap: () => _openUrl('https://stockmarketroi.com/terms'),
+            ),
+
+            const SizedBox(height: 8),
+            const _Section('About'),
+            _Item(
+              icon: Icons.info_rounded,
+              label: 'About Stock Market ROI',
+              onTap: () => _openUrl('https://stockmarketroi.com/about'),
+            ),
+            Consumer(builder: (context, ref, _) {
+              final v = ref.watch(_appVersionProvider).valueOrNull;
+              return _Item(
+                icon: Icons.tag_rounded,
+                label: 'Version',
+                trailing: v ?? '—',
+                chevron: false,
+              );
+            }),
 
             if (user != null) ...[
               const SizedBox(height: 24),
@@ -516,12 +682,16 @@ class _Section extends StatelessWidget {
 class _Item extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final String? trailing;
+  final bool chevron;
 
   const _Item({
     required this.icon,
     required this.label,
-    required this.onTap,
+    this.onTap,
+    this.trailing,
+    this.chevron = true,
   });
 
   @override
@@ -549,7 +719,13 @@ class _Item extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: c.textPrimary)),
           ),
-          Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+          if (trailing != null) ...[
+            Text(trailing!,
+                style: TextStyle(fontSize: 13, color: c.textMuted)),
+            const SizedBox(width: 6),
+          ],
+          if (chevron)
+            Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
         ]),
       ),
     );

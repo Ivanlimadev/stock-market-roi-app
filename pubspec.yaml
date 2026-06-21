@@ -17,6 +17,9 @@ dependencies:
   # Avatar photo picking
   image_picker: ^1.1.2
 
+  # App version for the Settings → About row
+  package_info_plus: ^8.1.1
+
   # Push notifications
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3
