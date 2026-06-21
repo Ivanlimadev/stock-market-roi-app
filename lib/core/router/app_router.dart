@@ -68,9 +68,6 @@ final appRouter = GoRouter(
     // Compare — outside shell
     GoRoute(path: '/compare',   builder: (_, $) => const ComparePage()),
 
-    // US Macro Dashboard — outside shell
-    GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
-
     // Macro detail — outside shell
     GoRoute(
       path: '/us-macro/:id',
@@ -140,6 +137,7 @@ final appRouter = GoRouter(
         GoRoute(path: '/news',      builder: (_, $) => const NewsPage()),
         GoRoute(path: '/crypto',    builder: (_, $) => const CryptoPage()),
         GoRoute(path: '/perfil',    builder: (_, $) => const PerfilPage()),
+        GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
       ],
     ),
   ],

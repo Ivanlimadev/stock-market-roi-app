@@ -54,6 +54,7 @@ class _MainShellState extends State<MainShell> {
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
+    if (location.startsWith('/us-macro')) return 1; // Finance tab
     final idx = _tabs.indexWhere((t) => location.startsWith(t.path));
     return idx < 0 ? 0 : idx;
   }
