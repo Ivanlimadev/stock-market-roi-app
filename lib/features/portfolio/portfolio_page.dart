@@ -90,6 +90,7 @@ class _LoggedInPortfolioState extends ConsumerState<_LoggedInPortfolio>
             onPressed: _refresh,
           ),
           MainShellMenu.themeButton(),
+          MainShellMenu.settingsButton(),
         ],
         bottom: TabBar(
           controller: _tab,

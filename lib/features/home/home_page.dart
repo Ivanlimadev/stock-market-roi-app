@@ -102,6 +102,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               },
             ),
             MainShellMenu.themeButton(),
+            MainShellMenu.settingsButton(),
           ],
         ],
       ),

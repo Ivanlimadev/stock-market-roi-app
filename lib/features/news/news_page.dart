@@ -61,6 +61,7 @@ class _NewsPageState extends ConsumerState<NewsPage>
             onPressed: () => ref.invalidate(blogPostsProvider),
           ),
           MainShellMenu.themeButton(),
+          MainShellMenu.settingsButton(),
         ],
         bottom: TabBar(
           controller: _tab,

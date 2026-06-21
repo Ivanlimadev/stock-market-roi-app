@@ -50,6 +50,7 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
                   onPressed: _refresh,
                 ),
                 MainShellMenu.themeButton(),
+                MainShellMenu.settingsButton(),
               ],
             ),
 

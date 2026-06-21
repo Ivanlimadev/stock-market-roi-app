@@ -29,6 +29,7 @@ import '../../features/heatmap/heatmap_page.dart';
 import '../../features/compare/compare_page.dart';
 import '../../features/editorial/editorial_rankings_page.dart';
 import '../../features/finance/us_macro_page.dart';
+import '../../features/settings/settings_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
@@ -51,6 +52,9 @@ final appRouter = GoRouter(
     GoRoute(path: '/login',           builder: (_, $) => const LoginPage()),
     GoRoute(path: '/register',        builder: (_, $) => const RegisterPage()),
     GoRoute(path: '/forgot-password', builder: (_, $) => const ForgotPasswordPage()),
+
+    // Settings — outside shell (full screen, back button)
+    GoRoute(path: '/settings',  builder: (_, $) => const SettingsPage()),
 
     // Watchlist — outside shell (full screen, back button)
     GoRoute(path: '/watchlist', builder: (_, $) => const WatchlistPage()),

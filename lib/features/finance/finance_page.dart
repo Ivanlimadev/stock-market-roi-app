@@ -95,6 +95,7 @@ class _FinancePageState extends ConsumerState<FinancePage>
             onPressed: () => context.push('/us-macro'),
           ),
           MainShellMenu.themeButton(),
+          MainShellMenu.settingsButton(),
         ],
         bottom: TabBar(
           controller: _tab,
