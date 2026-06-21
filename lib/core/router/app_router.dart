@@ -29,6 +29,7 @@ import '../../features/heatmap/heatmap_page.dart';
 import '../../features/compare/compare_page.dart';
 import '../../features/editorial/editorial_rankings_page.dart';
 import '../../features/finance/us_macro_page.dart';
+import '../../features/finance/macro_detail_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
@@ -69,6 +70,14 @@ final appRouter = GoRouter(
 
     // US Macro Dashboard — outside shell
     GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
+
+    // Macro detail — outside shell
+    GoRoute(
+      path: '/us-macro/:id',
+      builder: (_, state) => MacroDetailPage(
+        seriesId: state.pathParameters['id'] ?? '',
+      ),
+    ),
 
     // Editorial rankings — outside shell
     GoRoute(

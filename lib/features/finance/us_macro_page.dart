@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/models/macro_model.dart';
 import '../../core/providers/macro_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -152,7 +153,10 @@ class _IndicatorCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       color: context.colors.surface,
       elevation: 0,
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/us-macro/${indicator.id}'),
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,6 +212,7 @@ class _IndicatorCard extends StatelessWidget {
               _Sparkline(values: indicator.history, color: changeColor),
             ],
           ],
+        ),
         ),
       ),
     );
