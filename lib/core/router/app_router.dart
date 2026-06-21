@@ -56,6 +56,10 @@ final appRouter = GoRouter(
     // Settings — outside shell (full screen, back button)
     GoRoute(path: '/settings',  builder: (_, $) => const SettingsPage()),
 
+    // My Account — outside shell (avoids a 2nd MainShell / duplicate scaffoldKey
+    // when pushed on top of a shell route from Settings)
+    GoRoute(path: '/perfil',    builder: (_, $) => const PerfilPage()),
+
     // Watchlist — outside shell (full screen, back button)
     GoRoute(path: '/watchlist', builder: (_, $) => const WatchlistPage()),
 
@@ -131,7 +135,6 @@ final appRouter = GoRouter(
         GoRoute(path: '/portfolio', builder: (_, $) => const PortfolioPage()),
         GoRoute(path: '/news',      builder: (_, $) => const NewsPage()),
         GoRoute(path: '/crypto',    builder: (_, $) => const CryptoPage()),
-        GoRoute(path: '/perfil',    builder: (_, $) => const PerfilPage()),
         GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
       ],
     ),
