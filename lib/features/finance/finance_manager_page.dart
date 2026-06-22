@@ -35,6 +35,11 @@ class FinanceManagerPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Finance'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.public_rounded),
+            tooltip: 'US Economy',
+            onPressed: () => context.push('/us-macro'),
+          ),
           if (user != null)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded),
