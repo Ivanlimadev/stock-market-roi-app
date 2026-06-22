@@ -66,6 +66,11 @@ class _AppMenu extends StatelessWidget {
                   label: 'Calendar',
                   onTap: () => _go(context, '/calendar'),
                 ),
+                _MenuItem(
+                  icon: Icons.public_rounded,
+                  label: 'US Economy',
+                  onTap: () => _go(context, '/us-macro'),
+                ),
                 const SizedBox(height: 8),
                 const _MenuSection('Tools'),
                 _MenuItem(
