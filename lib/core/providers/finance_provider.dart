@@ -168,6 +168,21 @@ class FinanceRepo {
         'institution': institution,
       });
 
+  static Future<void> updateAccount({
+    required String id,
+    required String name,
+    required String type,
+    required double balance,
+    String? institution,
+  }) =>
+      _db.from('finance_accounts').update({
+        'name': name,
+        'type': type,
+        'balance': balance,
+        'institution': institution,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', id).eq('user_id', _uid);
+
   static Future<void> deleteAccount(String id) =>
       _db.from('finance_accounts').delete().eq('id', id).eq('user_id', _uid);
 
@@ -188,6 +203,24 @@ class FinanceRepo {
         'category_id': categoryId,
         'note': note,
       });
+
+  static Future<void> updateTransaction({
+    required String id,
+    required String type,
+    required double amount,
+    required String date,
+    String? accountId,
+    String? categoryId,
+    String? note,
+  }) =>
+      _db.from('finance_transactions').update({
+        'type': type,
+        'amount': amount,
+        'date': date,
+        'account_id': accountId,
+        'category_id': categoryId,
+        'note': note,
+      }).eq('id', id).eq('user_id', _uid);
 
   static Future<void> deleteTransaction(String id) =>
       _db.from('finance_transactions').delete().eq('id', id).eq('user_id', _uid);

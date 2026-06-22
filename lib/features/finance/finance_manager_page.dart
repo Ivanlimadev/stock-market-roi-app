@@ -31,7 +31,16 @@ class FinanceManagerPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Finance'),
-        actions: [MainShellMenu.themeButton(), MainShellMenu.settingsButton()],
+        actions: [
+          if (user != null)
+            IconButton(
+              icon: const Icon(Icons.tune_rounded),
+              tooltip: 'Categories',
+              onPressed: () => _manageCategories(context, ref),
+            ),
+          MainShellMenu.themeButton(),
+          MainShellMenu.settingsButton(),
+        ],
       ),
       floatingActionButton: user == null
           ? null
@@ -183,10 +192,14 @@ class _Dashboard extends ConsumerWidget {
           else if (accounts.isEmpty)
             _Empty('No accounts yet. Add your bank, card or cash to start your net worth.')
           else
-            ...accounts.map((a) => _AccountTile(account: a, onDelete: () async {
-                  await FinanceRepo.deleteAccount(a.id);
-                  ref.invalidate(financeAccountsProvider);
-                })),
+            ...accounts.map((a) => _AccountTile(
+                  account: a,
+                  onEdit: () => _addAccount(context, ref, account: a),
+                  onDelete: () async {
+                    await FinanceRepo.deleteAccount(a.id);
+                    ref.invalidate(financeAccountsProvider);
+                  },
+                )),
 
           const SizedBox(height: 24),
           _SectionHeader(title: 'Budgets · $monthLabel', action: 'Manage', onAction: () => _manageBudgets(context, ref, categories, budgets)),
@@ -227,6 +240,7 @@ class _Dashboard extends ConsumerWidget {
             ...txns.take(15).map((t) => _TxnTile(
                   txn: t,
                   categoryName: t.categoryId != null ? catName[t.categoryId] : null,
+                  onEdit: () => _addTransaction(context, ref, txn: t),
                   onDelete: () async {
                     await FinanceRepo.deleteTransaction(t.id);
                     ref.invalidate(financeTransactionsProvider);
@@ -373,8 +387,9 @@ const _accountIcons = <String, IconData>{
 
 class _AccountTile extends StatelessWidget {
   final FinanceAccount account;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
-  const _AccountTile({required this.account, required this.onDelete});
+  const _AccountTile({required this.account, required this.onEdit, required this.onDelete});
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -388,6 +403,7 @@ class _AccountTile extends StatelessWidget {
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           Text('${account.isLiability ? '-' : ''}${_money.format(account.balance)}',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: account.isLiability ? AppColors.red : c.textPrimary)),
+          IconButton(icon: Icon(Icons.edit_rounded, size: 16, color: c.textMuted), onPressed: onEdit),
           IconButton(icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.textMuted), onPressed: onDelete),
         ]),
       ),
@@ -398,8 +414,9 @@ class _AccountTile extends StatelessWidget {
 class _TxnTile extends StatelessWidget {
   final FinanceTransaction txn;
   final String? categoryName;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
-  const _TxnTile({required this.txn, this.categoryName, required this.onDelete});
+  const _TxnTile({required this.txn, this.categoryName, required this.onEdit, required this.onDelete});
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -408,6 +425,7 @@ class _TxnTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.surfaceAlt)),
       child: ListTile(
+        onTap: onEdit,
         leading: CircleAvatar(
           backgroundColor: income ? AppColors.emerald.withValues(alpha: 0.15) : c.surfaceAlt,
           child: Icon(income ? Icons.trending_up_rounded : Icons.trending_down_rounded, size: 18, color: income ? AppColors.emerald : c.textSecond),
@@ -655,10 +673,11 @@ Future<void> _manageBudgets(BuildContext context, WidgetRef ref, List<FinanceCat
   }
 }
 
-Future<void> _addAccount(BuildContext context, WidgetRef ref) async {
-  final nameCtrl = TextEditingController();
-  final balCtrl = TextEditingController();
-  String type = 'checking';
+Future<void> _addAccount(BuildContext context, WidgetRef ref, {FinanceAccount? account}) async {
+  final nameCtrl = TextEditingController(text: account?.name ?? '');
+  final balCtrl = TextEditingController(text: account != null ? account.balance.toString() : '');
+  final instCtrl = TextEditingController(text: account?.institution ?? '');
+  String type = account?.type ?? 'checking';
   final ok = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -671,7 +690,7 @@ Future<void> _addAccount(BuildContext context, WidgetRef ref) async {
         return Padding(
           padding: const EdgeInsets.all(20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Add account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+            Text(account == null ? 'Add account' : 'Edit account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
             const SizedBox(height: 16),
             TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Account name (e.g. Chase Checking)')),
             const SizedBox(height: 12),
@@ -682,11 +701,13 @@ Future<void> _addAccount(BuildContext context, WidgetRef ref) async {
             ),
             const SizedBox(height: 12),
             TextField(controller: balCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: 'Current balance')),
+            const SizedBox(height: 12),
+            TextField(controller: instCtrl, decoration: const InputDecoration(hintText: 'Institution (optional)')),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: FilledButton.styleFrom(backgroundColor: AppColors.emerald),
-              child: const Text('Add account'),
+              child: Text(account == null ? 'Add account' : 'Save'),
             ),
           ]),
         );
@@ -694,18 +715,24 @@ Future<void> _addAccount(BuildContext context, WidgetRef ref) async {
     ),
   );
   if (ok == true && nameCtrl.text.trim().isNotEmpty) {
-    await FinanceRepo.addAccount(name: nameCtrl.text.trim(), type: type, balance: double.tryParse(balCtrl.text) ?? 0);
+    final inst = instCtrl.text.trim().isEmpty ? null : instCtrl.text.trim();
+    final bal = double.tryParse(balCtrl.text) ?? 0;
+    if (account != null) {
+      await FinanceRepo.updateAccount(id: account.id, name: nameCtrl.text.trim(), type: type, balance: bal, institution: inst);
+    } else {
+      await FinanceRepo.addAccount(name: nameCtrl.text.trim(), type: type, balance: bal, institution: inst);
+    }
     ref.invalidate(financeAccountsProvider);
   }
 }
 
-Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
-  final amountCtrl = TextEditingController();
-  final noteCtrl = TextEditingController();
+Future<void> _addTransaction(BuildContext context, WidgetRef ref, {FinanceTransaction? txn}) async {
+  final amountCtrl = TextEditingController(text: txn != null ? txn.amount.toString() : '');
+  final noteCtrl = TextEditingController(text: txn?.note ?? '');
   final categories = ref.read(financeCategoriesProvider).valueOrNull ?? [];
-  String type = 'expense';
-  String? categoryId;
-  DateTime date = DateTime.now();
+  String type = txn?.type == 'income' ? 'income' : 'expense';
+  String? categoryId = txn?.categoryId;
+  DateTime date = txn != null ? (DateTime.tryParse(txn.date) ?? DateTime.now()) : DateTime.now();
   final ok = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -718,7 +745,7 @@ Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
         return Padding(
           padding: const EdgeInsets.all(20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Add transaction', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+            Text(txn == null ? 'Add transaction' : 'Edit transaction', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
             const SizedBox(height: 16),
             Row(children: [
               for (final t in ['expense', 'income'])
@@ -773,12 +800,13 @@ Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
   );
   final amt = double.tryParse(amountCtrl.text) ?? 0;
   if (ok == true && amt > 0) {
-    await FinanceRepo.addTransaction(
-      type: type, amount: amt,
-      date: DateFormat('yyyy-MM-dd').format(date),
-      categoryId: categoryId,
-      note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
-    );
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final note = noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim();
+    if (txn != null) {
+      await FinanceRepo.updateTransaction(id: txn.id, type: type, amount: amt, date: dateStr, categoryId: categoryId, note: note);
+    } else {
+      await FinanceRepo.addTransaction(type: type, amount: amt, date: dateStr, categoryId: categoryId, note: note);
+    }
     ref.invalidate(financeTransactionsProvider);
   }
 }
@@ -911,5 +939,122 @@ Future<void> _editGoal(BuildContext context, WidgetRef ref, FinanceGoal? goal) a
       targetDate: targetDate != null ? DateFormat('yyyy-MM-dd').format(targetDate!) : null,
     );
     ref.invalidate(financeGoalsProvider);
+  }
+}
+
+Future<void> _manageCategories(BuildContext context, WidgetRef ref) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.colors.background,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: const _CategoriesSheet(),
+    ),
+  );
+}
+
+class _CategoriesSheet extends ConsumerStatefulWidget {
+  const _CategoriesSheet();
+  @override
+  ConsumerState<_CategoriesSheet> createState() => _CategoriesSheetState();
+}
+
+class _CategoriesSheetState extends ConsumerState<_CategoriesSheet> {
+  final _newCtrl = TextEditingController();
+  String _newKind = 'expense';
+
+  @override
+  void dispose() {
+    _newCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _add() async {
+    if (_newCtrl.text.trim().isEmpty) return;
+    await FinanceRepo.addCategory(_newCtrl.text.trim(), _newKind);
+    _newCtrl.clear();
+    ref.invalidate(financeCategoriesProvider);
+  }
+
+  Future<void> _rename(FinanceCategory cat) async {
+    final ctrl = TextEditingController(text: cat.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        backgroundColor: context.colors.background,
+        title: const Text('Rename category'),
+        content: TextField(controller: ctrl, autofocus: true),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, ctrl.text.trim()), style: FilledButton.styleFrom(backgroundColor: AppColors.emerald), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty && name != cat.name) {
+      await FinanceRepo.renameCategory(cat.id, name);
+      ref.invalidate(financeCategoriesProvider);
+    }
+  }
+
+  Future<void> _delete(FinanceCategory cat) async {
+    await FinanceRepo.deleteCategory(cat.id);
+    ref.invalidate(financeCategoriesProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final cats = ref.watch(financeCategoriesProvider).valueOrNull ?? [];
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.9,
+      builder: (ctx, scroll) => Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+          child: Row(children: [
+            Text('Categories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+            const Spacer(),
+            IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close_rounded, color: c.textMuted)),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(children: [
+            Expanded(child: TextField(controller: _newCtrl, decoration: const InputDecoration(hintText: 'New category'))),
+            const SizedBox(width: 8),
+            DropdownButton<String>(
+              value: _newKind,
+              items: const [DropdownMenuItem(value: 'expense', child: Text('Expense')), DropdownMenuItem(value: 'income', child: Text('Income'))],
+              onChanged: (v) => setState(() => _newKind = v ?? 'expense'),
+            ),
+            IconButton(onPressed: _add, icon: const Icon(Icons.add_rounded, color: AppColors.emerald)),
+          ]),
+        ),
+        const SizedBox(height: 4),
+        Expanded(
+          child: ListView(controller: scroll, children: [
+            for (final kind in const ['expense', 'income']) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                child: Text(kind.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c.textMuted, letterSpacing: 0.8)),
+              ),
+              for (final cat in cats.where((x) => x.kind == kind))
+                ListTile(
+                  dense: true,
+                  title: Text(cat.name, style: TextStyle(fontSize: 14, color: c.textPrimary)),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(icon: Icon(Icons.edit_rounded, size: 18, color: c.textMuted), onPressed: () => _rename(cat)),
+                    IconButton(icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.textMuted), onPressed: () => _delete(cat)),
+                  ]),
+                ),
+            ],
+            const SizedBox(height: 24),
+          ]),
+        ),
+      ]),
+    );
   }
 }
