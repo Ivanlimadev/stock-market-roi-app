@@ -386,7 +386,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
           _SectionHeader(
             title: 'Crypto',
             trailing: TextButton(
-              onPressed: () => context.go('/crypto'),
+              onPressed: () => context.push('/crypto'),
               child: Text('See more', style: TextStyle(color: AppColors.emerald, fontSize: 12)),
             ),
           ),

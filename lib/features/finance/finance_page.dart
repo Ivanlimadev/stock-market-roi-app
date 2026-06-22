@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/api/api_client.dart';
 import '../../core/shell/main_shell.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -86,8 +87,9 @@ class _FinancePageState extends ConsumerState<FinancePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(
-        title: Text('Finance'),
+        title: Text('Calendar'),
         actions: [
           IconButton(
             icon: const Icon(Icons.public_rounded),
