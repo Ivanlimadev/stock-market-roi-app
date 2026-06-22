@@ -7,6 +7,7 @@ import '../../features/auth/forgot_password_page.dart';
 import '../../features/home/home_page.dart';
 import '../../features/stocks/stock_detail_page.dart';
 import '../../features/finance/finance_page.dart';
+import '../../features/finance/finance_manager_page.dart';
 import '../../features/portfolio/portfolio_page.dart';
 import '../../features/news/news_page.dart';
 import '../../features/crypto/crypto_page.dart';
@@ -61,6 +62,9 @@ final appRouter = GoRouter(
     // My Account — outside shell (avoids a 2nd MainShell / duplicate scaffoldKey
     // when pushed on top of a shell route from Settings)
     GoRoute(path: '/perfil',    builder: (_, $) => const PerfilPage()),
+
+    // Calendar (earnings/dividends) — outside shell, pushed from the Menu
+    GoRoute(path: '/calendar',  builder: (_, $) => const FinancePage()),
 
     // Crypto — outside shell so it can be pushed from the Menu with a back button
     GoRoute(path: '/crypto',    builder: (_, $) => const CryptoPage()),
@@ -136,7 +140,7 @@ final appRouter = GoRouter(
       builder: (context, state, child) => MainShell(child: child),
       routes: [
         GoRoute(path: '/home',      builder: (_, $) => const HomePage()),
-        GoRoute(path: '/finance',   builder: (_, $) => const FinancePage()),
+        GoRoute(path: '/finance',   builder: (_, $) => const FinanceManagerPage()),
         GoRoute(path: '/portfolio', builder: (_, $) => const PortfolioPage()),
         GoRoute(path: '/news',      builder: (_, $) => const NewsPage()),
         GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
