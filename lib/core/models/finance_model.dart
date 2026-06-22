@@ -59,6 +59,43 @@ class FinanceTransaction {
       );
 }
 
+class FinanceCategory {
+  final String id;
+  final String name;
+  final String kind; // expense|income
+
+  const FinanceCategory({required this.id, required this.name, required this.kind});
+
+  factory FinanceCategory.fromJson(Map<String, dynamic> j) => FinanceCategory(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        kind: j['kind'] as String? ?? 'expense',
+      );
+}
+
+class FinanceBudget {
+  final String id;
+  final String categoryId;
+  final double amount;
+
+  const FinanceBudget({required this.id, required this.categoryId, required this.amount});
+
+  factory FinanceBudget.fromJson(Map<String, dynamic> j) => FinanceBudget(
+        id: j['id'] as String,
+        categoryId: j['category_id'] as String,
+        amount: (j['amount'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+// Seeded for new users on first load (US-oriented defaults).
+const kDefaultCategories = <List<String>>[
+  ['Groceries', 'expense'], ['Dining & Drinks', 'expense'], ['Transport', 'expense'],
+  ['Housing & Rent', 'expense'], ['Utilities', 'expense'], ['Shopping', 'expense'],
+  ['Health', 'expense'], ['Entertainment', 'expense'], ['Subscriptions', 'expense'],
+  ['Travel', 'expense'], ['Fees & Charges', 'expense'], ['Other', 'expense'],
+  ['Salary', 'income'], ['Freelance', 'income'], ['Investments', 'income'], ['Other Income', 'income'],
+];
+
 const kAccountTypes = <String, String>{
   'checking': 'Checking',
   'savings': 'Savings',

@@ -34,10 +34,56 @@ final financeTransactionsProvider =
       .toList();
 });
 
+final financeCategoriesProvider =
+    FutureProvider.autoDispose<List<FinanceCategory>>((ref) async {
+  final user = _db.auth.currentUser;
+  if (user == null) return [];
+  const sel = 'id, name, kind';
+  List<dynamic> data = await _db.from('finance_categories').select(sel).eq('user_id', user.id).order('kind').order('name');
+  // Seed defaults on first use.
+  if (data.isEmpty) {
+    final rows = kDefaultCategories.map((c) => {'user_id': user.id, 'name': c[0], 'kind': c[1]}).toList();
+    data = await _db.from('finance_categories').insert(rows).select(sel);
+  }
+  return data
+      .map((e) => FinanceCategory.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
+final financeBudgetsProvider =
+    FutureProvider.autoDispose<List<FinanceBudget>>((ref) async {
+  final user = _db.auth.currentUser;
+  if (user == null) return [];
+  final res = await _db.from('finance_budgets').select('id, category_id, amount').eq('user_id', user.id);
+  return (res as List)
+      .map((e) => FinanceBudget.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
 /// Mutations. RLS scopes everything to the signed-in user; we also set user_id
 /// on insert so the WITH CHECK policy passes.
 class FinanceRepo {
   static String get _uid => _db.auth.currentUser!.id;
+
+  static Future<void> addCategory(String name, String kind) =>
+      _db.from('finance_categories').insert({'user_id': _uid, 'name': name, 'kind': kind});
+
+  static Future<void> renameCategory(String id, String name) =>
+      _db.from('finance_categories').update({'name': name}).eq('id', id).eq('user_id', _uid);
+
+  static Future<void> deleteCategory(String id) =>
+      _db.from('finance_categories').delete().eq('id', id).eq('user_id', _uid);
+
+  static Future<void> setBudget(String categoryId, double amount) async {
+    if (amount <= 0) {
+      await _db.from('finance_budgets').delete().eq('user_id', _uid).eq('category_id', categoryId).eq('period', 'monthly');
+      return;
+    }
+    await _db.from('finance_budgets').upsert(
+      {'user_id': _uid, 'category_id': categoryId, 'amount': amount, 'period': 'monthly'},
+      onConflict: 'user_id,category_id,period',
+    );
+  }
 
   static Future<void> addAccount({
     required String name,
