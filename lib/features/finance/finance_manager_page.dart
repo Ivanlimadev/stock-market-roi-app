@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/shell/main_shell.dart';
@@ -33,10 +36,16 @@ class FinanceManagerPage extends ConsumerWidget {
         title: const Text('Finance'),
         actions: [
           if (user != null)
-            IconButton(
-              icon: const Icon(Icons.tune_rounded),
-              tooltip: 'Categories',
-              onPressed: () => _manageCategories(context, ref),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (v) {
+                if (v == 'categories') _manageCategories(context, ref);
+                if (v == 'import') _importCsv(context, ref);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'categories', child: Text('Manage categories')),
+                PopupMenuItem(value: 'import', child: Text('Import CSV')),
+              ],
             ),
           MainShellMenu.themeButton(),
           MainShellMenu.settingsButton(),
@@ -1057,4 +1066,131 @@ class _CategoriesSheetState extends ConsumerState<_CategoriesSheet> {
       ]),
     );
   }
+}
+
+List<Map<String, dynamic>> _parseCsv(String text, String def) {
+  final lines = text.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+  if (lines.isEmpty) return [];
+  final first = lines.first.toLowerCase();
+  final start = (first.contains('date') || first.contains('amount')) ? 1 : 0;
+  final out = <Map<String, dynamic>>[];
+  for (final line in lines.skip(start)) {
+    final cols = line.split(',').map((c) => c.trim()).toList();
+    if (cols.length < 2) continue;
+    var date = cols[0];
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) {
+      final d = DateTime.tryParse(date);
+      if (d == null) continue;
+      date = DateFormat('yyyy-MM-dd').format(d);
+    }
+    final raw = double.tryParse(cols[1].replaceAll(RegExp(r'[$,]'), ''));
+    if (raw == null || raw == 0) continue;
+    final c2 = cols.length > 2 ? cols[2].toLowerCase() : '';
+    final hasTypeCol = c2 == 'income' || c2 == 'expense';
+    String type = def == 'income' ? 'income' : 'expense';
+    if (hasTypeCol) {
+      type = c2;
+    } else if (def == 'sign') {
+      type = raw < 0 ? 'expense' : 'income';
+    }
+    final note = hasTypeCol ? (cols.length > 3 ? cols[3] : null) : (cols.length > 2 ? cols[2] : null);
+    out.add({'type': type, 'amount': raw.abs(), 'date': date, 'note': (note == null || note.isEmpty) ? null : note});
+  }
+  return out;
+}
+
+Future<void> _importCsv(BuildContext context, WidgetRef ref) async {
+  String def = 'expense';
+  String raw = '';
+  String fileName = '';
+  String err = '';
+  bool saving = false;
+  List<Map<String, dynamic>> rows = [];
+
+  final imported = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.colors.background,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: StatefulBuilder(builder: (ctx, setS) {
+        final c = ctx.colors;
+
+        void reparse() {
+          if (raw.isEmpty) return;
+          rows = _parseCsv(raw, def);
+          err = rows.isEmpty ? 'No rows parsed. Expected: date, amount, [type], [note].' : '';
+        }
+
+        Future<void> pick() async {
+          final res = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['csv'], withData: true);
+          if (res == null) return;
+          final f = res.files.single;
+          String? content;
+          if (f.bytes != null) {
+            content = utf8.decode(f.bytes!);
+          } else if (f.path != null) {
+            content = await File(f.path!).readAsString();
+          }
+          if (content == null) {
+            setS(() => err = 'Could not read file.');
+            return;
+          }
+          setS(() { raw = content!; fileName = f.name; reparse(); });
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Import transactions (CSV)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+            const SizedBox(height: 8),
+            Text('Columns: date, amount, type, note — type and note optional.\nExample: 2026-06-01, 49.90, expense, Internet',
+                style: TextStyle(fontSize: 12, color: c.textMuted)),
+            const SizedBox(height: 12),
+            Text('When the type column is missing, treat amounts as', style: TextStyle(fontSize: 11, color: c.textMuted)),
+            const SizedBox(height: 6),
+            Row(children: [
+              for (final o in const [['expense', 'Expenses'], ['income', 'Income'], ['sign', 'By sign']])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(label: Text(o[1]), selected: def == o[0], onSelected: (_) => setS(() { def = o[0]; reparse(); })),
+                ),
+            ]),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(onPressed: pick, icon: const Icon(Icons.upload_file_rounded, size: 18), label: Text(fileName.isEmpty ? 'Choose CSV file' : fileName)),
+            if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(err, style: TextStyle(fontSize: 12, color: AppColors.red))),
+            if (rows.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: c.surfaceAlt)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${rows.length} transactions ready', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                  const SizedBox(height: 4),
+                  for (final r in rows.take(3))
+                    Text('${r['date']} · ${r['type'] == 'income' ? '+' : '-'}${_money.format(r['amount'])}${r['note'] != null ? ' · ${r['note']}' : ''}',
+                        style: TextStyle(fontSize: 11, color: c.textMuted)),
+                  if (rows.length > 3) Text('…and ${rows.length - 3} more', style: TextStyle(fontSize: 11, color: c.textMuted)),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: (rows.isEmpty || saving)
+                  ? null
+                  : () async {
+                      setS(() => saving = true);
+                      await FinanceRepo.addTransactionsBulk(rows);
+                      if (ctx.mounted) Navigator.pop(ctx, true);
+                    },
+              style: FilledButton.styleFrom(backgroundColor: AppColors.emerald),
+              child: Text(saving ? 'Importing…' : 'Import ${rows.isEmpty ? '' : rows.length} transactions'),
+            ),
+          ]),
+        );
+      }),
+    ),
+  );
+  if (imported == true) ref.invalidate(financeTransactionsProvider);
 }

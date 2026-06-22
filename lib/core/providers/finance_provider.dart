@@ -204,6 +204,11 @@ class FinanceRepo {
         'note': note,
       });
 
+  static Future<void> addTransactionsBulk(List<Map<String, dynamic>> rows) =>
+      _db.from('finance_transactions').insert(
+            rows.map((r) => {...r, 'user_id': _uid}).toList(),
+          );
+
   static Future<void> updateTransaction({
     required String id,
     required String type,
