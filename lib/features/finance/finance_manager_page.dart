@@ -11,6 +11,15 @@ import '../../core/providers/finance_provider.dart';
 final _money = NumberFormat.currency(locale: 'en_US', symbol: '\$');
 String _monthKey() => DateFormat('yyyy-MM').format(DateTime.now());
 
+// Selected month (YYYY-MM) driving the "this month" views.
+final _selMonthProvider = StateProvider.autoDispose<String>((ref) => _monthKey());
+
+String _shiftMonth(String mk, int delta) {
+  final p = mk.split('-');
+  final d = DateTime(int.parse(p[0]), int.parse(p[1]) - 1 + delta, 1);
+  return DateFormat('yyyy-MM').format(d);
+}
+
 /// Personal finance manager — accounts, net worth and spending (manual-only).
 class FinanceManagerPage extends ConsumerWidget {
   const FinanceManagerPage({super.key});
@@ -84,7 +93,10 @@ class _Dashboard extends ConsumerWidget {
     final liabilities = accounts.where((a) => a.isLiability).fold(0.0, (s, a) => s + a.balance);
     final netWorth = assets - liabilities;
 
-    final mk = _monthKey();
+    final selMonth = ref.watch(_selMonthProvider);
+    final mk = selMonth;
+    final monthLabel = DateFormat('MMMM yyyy').format(DateTime.parse('$mk-01'));
+    final isCurrentMonth = mk == _monthKey();
     final month = txns.where((t) => t.date.startsWith(mk));
     final income = month.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
     final expense = month.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
@@ -107,6 +119,24 @@ class _Dashboard extends ConsumerWidget {
     final goals = ref.watch(financeGoalsProvider).valueOrNull ?? [];
     final monthlySubs = recurring.where((r) => r.active && r.type == 'expense').fold(0.0, (s, r) => s + r.perMonth);
 
+    // Reports: spending by category (selected month)
+    final spendCats = spentByCat.entries.map((e) => (name: catName[e.key] ?? 'Uncategorized', amount: e.value)).toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+    // Reports: income vs spending, last 6 months
+    final now = DateTime.now();
+    final last6 = <({String label, double income, double expense})>[];
+    for (var i = 5; i >= 0; i--) {
+      final d = DateTime(now.year, now.month - i, 1);
+      final key = DateFormat('yyyy-MM').format(d);
+      final inM = txns.where((t) => t.date.startsWith(key));
+      last6.add((
+        label: DateFormat('MMM').format(d),
+        income: inM.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount),
+        expense: inM.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount),
+      ));
+    }
+    final max6 = last6.fold(1.0, (m, x) => [m, x.income, x.expense].reduce((a, b) => a > b ? a : b));
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(financeAccountsProvider);
@@ -119,6 +149,13 @@ class _Dashboard extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
+          // Month selector
+          Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(onPressed: () => ref.read(_selMonthProvider.notifier).state = _shiftMonth(mk, -1), icon: const Icon(Icons.chevron_left_rounded)),
+            Text(monthLabel, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+            IconButton(onPressed: isCurrentMonth ? null : () => ref.read(_selMonthProvider.notifier).state = _shiftMonth(mk, 1), icon: const Icon(Icons.chevron_right_rounded)),
+          ])),
+          const SizedBox(height: 8),
           // Net worth
           _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Net Worth', style: TextStyle(fontSize: 12, color: c.textMuted)),
@@ -132,9 +169,9 @@ class _Dashboard extends ConsumerWidget {
           ])),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: _StatCard(label: 'Income · this month', value: income, color: AppColors.emerald, up: true)),
+            Expanded(child: _StatCard(label: 'Income · $monthLabel', value: income, color: AppColors.emerald, up: true)),
             const SizedBox(width: 12),
-            Expanded(child: _StatCard(label: 'Spending · this month', value: expense, color: AppColors.red, up: false)),
+            Expanded(child: _StatCard(label: 'Spending · $monthLabel', value: expense, color: AppColors.red, up: false)),
           ]),
           const SizedBox(height: 24),
 
@@ -152,7 +189,7 @@ class _Dashboard extends ConsumerWidget {
                 })),
 
           const SizedBox(height: 24),
-          _SectionHeader(title: 'Budgets · this month', action: 'Manage', onAction: () => _manageBudgets(context, ref, categories, budgets)),
+          _SectionHeader(title: 'Budgets · $monthLabel', action: 'Manage', onAction: () => _manageBudgets(context, ref, categories, budgets)),
           const SizedBox(height: 8),
           if (budgetRows.isEmpty)
             _Empty('No budgets yet. Tap “Manage” to set a monthly limit per category.')
@@ -210,6 +247,39 @@ class _Dashboard extends ConsumerWidget {
                     ref.invalidate(financeGoalsProvider);
                   },
                 )),
+
+          const SizedBox(height: 24),
+          _SectionHeader(title: 'Spending by category · $monthLabel'),
+          const SizedBox(height: 8),
+          _Card(child: spendCats.isEmpty
+              ? Text('No spending yet this month.', style: TextStyle(fontSize: 13, color: context.colors.textMuted))
+              : Column(children: [
+                  for (final s in spendCats.take(8)) _SpendRow(name: s.name, amount: s.amount, total: expense),
+                ])),
+
+          const SizedBox(height: 16),
+          _SectionHeader(title: 'Income vs spending · last 6 months'),
+          const SizedBox(height: 8),
+          _Card(child: Column(children: [
+            SizedBox(height: 110, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              for (final m in last6)
+                Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  SizedBox(height: 86, child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
+                    _Bar(height: (m.income / max6 * 86).clamp(0.0, 86.0), color: AppColors.emerald),
+                    const SizedBox(width: 3),
+                    _Bar(height: (m.expense / max6 * 86).clamp(0.0, 86.0), color: AppColors.red),
+                  ])),
+                  const SizedBox(height: 4),
+                  Text(m.label, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+                ])),
+            ])),
+            const SizedBox(height: 8),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              _LegendDot(color: AppColors.emerald, label: 'Income'),
+              const SizedBox(width: 16),
+              _LegendDot(color: AppColors.red, label: 'Spending'),
+            ]),
+          ])),
         ],
       ),
     );
@@ -473,6 +543,50 @@ class _GoalCard extends StatelessWidget {
       ]),
     );
   }
+}
+
+class _SpendRow extends StatelessWidget {
+  final String name;
+  final double amount;
+  final double total;
+  const _SpendRow({required this.name, required this.amount, required this.total});
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final pct = total > 0 ? amount / total : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(name, style: TextStyle(fontSize: 12, color: c.textPrimary)),
+          Text('${_money.format(amount)} · ${(pct * 100).toStringAsFixed(0)}%', style: TextStyle(fontSize: 12, color: c.textMuted)),
+        ]),
+        const SizedBox(height: 4),
+        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: pct, minHeight: 5, backgroundColor: c.surfaceAlt, color: AppColors.emerald)),
+      ]),
+    );
+  }
+}
+
+class _Bar extends StatelessWidget {
+  final double height;
+  final Color color;
+  const _Bar({required this.height, required this.color});
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: 8, height: height, decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.vertical(top: Radius.circular(2))));
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+      ]);
 }
 
 // ── Add sheets ────────────────────────────────────────────────────────────────
