@@ -87,6 +87,77 @@ class FinanceBudget {
       );
 }
 
+class FinanceRecurring {
+  final String id;
+  final String name;
+  final double amount;
+  final String? categoryId;
+  final String frequency; // weekly|monthly|quarterly|yearly
+  final String? nextDue; // YYYY-MM-DD
+  final String type; // expense|income
+  final bool active;
+
+  const FinanceRecurring({
+    required this.id,
+    required this.name,
+    required this.amount,
+    this.categoryId,
+    required this.frequency,
+    this.nextDue,
+    required this.type,
+    required this.active,
+  });
+
+  factory FinanceRecurring.fromJson(Map<String, dynamic> j) => FinanceRecurring(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        amount: (j['amount'] as num?)?.toDouble() ?? 0,
+        categoryId: j['category_id'] as String?,
+        frequency: j['frequency'] as String? ?? 'monthly',
+        nextDue: j['next_due'] as String?,
+        type: j['type'] as String? ?? 'expense',
+        active: j['active'] as bool? ?? true,
+      );
+
+  double get perMonth => switch (frequency) {
+        'weekly' => amount * 4.345,
+        'quarterly' => amount / 3,
+        'yearly' => amount / 12,
+        _ => amount,
+      };
+}
+
+class FinanceGoal {
+  final String id;
+  final String name;
+  final double targetAmount;
+  final double currentAmount;
+  final String? targetDate;
+
+  const FinanceGoal({
+    required this.id,
+    required this.name,
+    required this.targetAmount,
+    required this.currentAmount,
+    this.targetDate,
+  });
+
+  factory FinanceGoal.fromJson(Map<String, dynamic> j) => FinanceGoal(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        targetAmount: (j['target_amount'] as num?)?.toDouble() ?? 0,
+        currentAmount: (j['current_amount'] as num?)?.toDouble() ?? 0,
+        targetDate: j['target_date'] as String?,
+      );
+}
+
+const kFrequencies = <String, String>{
+  'weekly': 'Weekly',
+  'monthly': 'Monthly',
+  'quarterly': 'Quarterly',
+  'yearly': 'Yearly',
+};
+
 // Seeded for new users on first load (US-oriented defaults).
 const kDefaultCategories = <List<String>>[
   ['Groceries', 'expense'], ['Dining & Drinks', 'expense'], ['Transport', 'expense'],

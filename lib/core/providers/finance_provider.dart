@@ -60,6 +60,34 @@ final financeBudgetsProvider =
       .toList();
 });
 
+final financeRecurringProvider =
+    FutureProvider.autoDispose<List<FinanceRecurring>>((ref) async {
+  final user = _db.auth.currentUser;
+  if (user == null) return [];
+  final res = await _db
+      .from('finance_recurring')
+      .select('id, name, amount, category_id, frequency, next_due, type, active')
+      .eq('user_id', user.id)
+      .order('next_due', ascending: true, nullsFirst: false);
+  return (res as List)
+      .map((e) => FinanceRecurring.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
+final financeGoalsProvider =
+    FutureProvider.autoDispose<List<FinanceGoal>>((ref) async {
+  final user = _db.auth.currentUser;
+  if (user == null) return [];
+  final res = await _db
+      .from('finance_goals')
+      .select('id, name, target_amount, current_amount, target_date')
+      .eq('user_id', user.id)
+      .order('created_at', ascending: true);
+  return (res as List)
+      .map((e) => FinanceGoal.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
 /// Mutations. RLS scopes everything to the signed-in user; we also set user_id
 /// on insert so the WITH CHECK policy passes.
 class FinanceRepo {
@@ -84,6 +112,47 @@ class FinanceRepo {
       onConflict: 'user_id,category_id,period',
     );
   }
+
+  static Future<void> addRecurring({
+    required String name,
+    required double amount,
+    required String type,
+    required String frequency,
+    String? nextDue,
+    String? categoryId,
+  }) =>
+      _db.from('finance_recurring').insert({
+        'user_id': _uid,
+        'name': name,
+        'amount': amount,
+        'type': type,
+        'frequency': frequency,
+        'next_due': nextDue,
+        'category_id': categoryId,
+      });
+
+  static Future<void> toggleRecurring(String id, bool active) =>
+      _db.from('finance_recurring').update({'active': active}).eq('id', id).eq('user_id', _uid);
+
+  static Future<void> deleteRecurring(String id) =>
+      _db.from('finance_recurring').delete().eq('id', id).eq('user_id', _uid);
+
+  static Future<void> saveGoal({
+    String? id,
+    required String name,
+    required double target,
+    required double current,
+    String? targetDate,
+  }) {
+    final data = {'name': name, 'target_amount': target, 'current_amount': current, 'target_date': targetDate};
+    if (id != null) {
+      return _db.from('finance_goals').update(data).eq('id', id).eq('user_id', _uid);
+    }
+    return _db.from('finance_goals').insert({...data, 'user_id': _uid});
+  }
+
+  static Future<void> deleteGoal(String id) =>
+      _db.from('finance_goals').delete().eq('id', id).eq('user_id', _uid);
 
   static Future<void> addAccount({
     required String name,

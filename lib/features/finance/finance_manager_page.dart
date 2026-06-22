@@ -103,12 +103,18 @@ class _Dashboard extends ConsumerWidget {
         .toList()
       ..sort((a, b) => (b.spent / (b.b.amount == 0 ? 1 : b.b.amount)).compareTo(a.spent / (a.b.amount == 0 ? 1 : a.b.amount)));
 
+    final recurring = ref.watch(financeRecurringProvider).valueOrNull ?? [];
+    final goals = ref.watch(financeGoalsProvider).valueOrNull ?? [];
+    final monthlySubs = recurring.where((r) => r.active && r.type == 'expense').fold(0.0, (s, r) => s + r.perMonth);
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(financeAccountsProvider);
         ref.invalidate(financeTransactionsProvider);
         ref.invalidate(financeCategoriesProvider);
         ref.invalidate(financeBudgetsProvider);
+        ref.invalidate(financeRecurringProvider);
+        ref.invalidate(financeGoalsProvider);
       },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -154,6 +160,26 @@ class _Dashboard extends ConsumerWidget {
             ...budgetRows.map((r) => _BudgetTile(name: r.name, spent: r.spent, limit: r.b.amount)),
 
           const SizedBox(height: 24),
+          _SectionHeader(title: 'Subscriptions & bills', action: 'Add', onAction: () => _addRecurring(context, ref)),
+          if (monthlySubs > 0)
+            Text('~${_money.format(monthlySubs)}/mo', style: TextStyle(fontSize: 11, color: context.colors.textMuted)),
+          const SizedBox(height: 8),
+          if (recurring.isEmpty)
+            _Empty('No subscriptions yet. Add Netflix, rent, gym… to track due dates.')
+          else
+            ...recurring.map((r) => _RecurringTile(
+                  recurring: r,
+                  onToggle: () async {
+                    await FinanceRepo.toggleRecurring(r.id, !r.active);
+                    ref.invalidate(financeRecurringProvider);
+                  },
+                  onDelete: () async {
+                    await FinanceRepo.deleteRecurring(r.id);
+                    ref.invalidate(financeRecurringProvider);
+                  },
+                )),
+
+          const SizedBox(height: 24),
           _SectionHeader(title: 'Recent transactions'),
           const SizedBox(height: 8),
           if (txnsAsync.isLoading)
@@ -167,6 +193,21 @@ class _Dashboard extends ConsumerWidget {
                   onDelete: () async {
                     await FinanceRepo.deleteTransaction(t.id);
                     ref.invalidate(financeTransactionsProvider);
+                  },
+                )),
+
+          const SizedBox(height: 24),
+          _SectionHeader(title: 'Goals', action: 'Add', onAction: () => _editGoal(context, ref, null)),
+          const SizedBox(height: 8),
+          if (goals.isEmpty)
+            _Empty('No goals yet. Set a target — emergency fund, vacation… and track progress.')
+          else
+            ...goals.map((g) => _GoalCard(
+                  goal: g,
+                  onEdit: () => _editGoal(context, ref, g),
+                  onDelete: () async {
+                    await FinanceRepo.deleteGoal(g.id);
+                    ref.invalidate(financeGoalsProvider);
                   },
                 )),
         ],
@@ -339,6 +380,96 @@ class _BudgetTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(value: pct, minHeight: 6, backgroundColor: c.surfaceAlt, color: color),
         ),
+      ]),
+    );
+  }
+}
+
+({String label, int level})? _dueBadge(String? nextDue) {
+  if (nextDue == null) return null;
+  final due = DateTime.tryParse(nextDue);
+  if (due == null) return null;
+  final now = DateTime.now();
+  final days = DateTime(due.year, due.month, due.day).difference(DateTime(now.year, now.month, now.day)).inDays;
+  if (days < 0) return (label: 'Overdue ${-days}d', level: 2);
+  if (days == 0) return (label: 'Due today', level: 1);
+  if (days <= 7) return (label: 'Due in ${days}d', level: 1);
+  return (label: 'in ${days}d', level: 0);
+}
+
+class _RecurringTile extends StatelessWidget {
+  final FinanceRecurring recurring;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
+  const _RecurringTile({required this.recurring, required this.onToggle, required this.onDelete});
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final r = recurring;
+    final income = r.type == 'income';
+    final badge = _dueBadge(r.nextDue);
+    final badgeColor = badge == null ? c.textMuted : (badge.level == 2 ? AppColors.red : badge.level == 1 ? AppColors.orange : c.textMuted);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.surfaceAlt)),
+      child: ListTile(
+        leading: CircleAvatar(backgroundColor: c.surfaceAlt, child: Icon(Icons.autorenew_rounded, size: 18, color: c.textSecond)),
+        title: Text('${r.name}${r.active ? '' : '  (paused)'}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.textPrimary)),
+        subtitle: Row(children: [
+          Text(kFrequencies[r.frequency] ?? r.frequency, style: TextStyle(fontSize: 11, color: c.textMuted)),
+          if (badge != null) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+              child: Text(badge.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: badgeColor)),
+            ),
+          ],
+        ]),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text('${income ? '+' : '-'}${_money.format(r.amount)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: income ? AppColors.emerald : c.textPrimary)),
+          IconButton(icon: Icon(r.active ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 18, color: c.textMuted), onPressed: onToggle),
+          IconButton(icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.textMuted), onPressed: onDelete),
+        ]),
+      ),
+    );
+  }
+}
+
+class _GoalCard extends StatelessWidget {
+  final FinanceGoal goal;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  const _GoalCard({required this.goal, required this.onEdit, required this.onDelete});
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final pct = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0) : 0.0;
+    final done = goal.currentAmount >= goal.targetAmount && goal.targetAmount > 0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.surfaceAlt)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.flag_rounded, size: 16, color: done ? AppColors.emerald : c.textMuted),
+          const SizedBox(width: 6),
+          Expanded(child: Text(goal.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.textPrimary))),
+          IconButton(visualDensity: VisualDensity.compact, icon: Icon(Icons.edit_rounded, size: 16, color: c.textMuted), onPressed: onEdit),
+          IconButton(visualDensity: VisualDensity.compact, icon: Icon(Icons.delete_outline_rounded, size: 16, color: c.textMuted), onPressed: onDelete),
+        ]),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+          Text(_money.format(goal.currentAmount), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.textPrimary)),
+          Text('of ${_money.format(goal.targetAmount)}', style: TextStyle(fontSize: 12, color: c.textMuted)),
+        ]),
+        const SizedBox(height: 6),
+        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: pct, minHeight: 6, backgroundColor: c.surfaceAlt, color: AppColors.emerald)),
+        const SizedBox(height: 6),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('${(pct * 100).toStringAsFixed(0)}%${done ? ' · reached 🎉' : ''}', style: TextStyle(fontSize: 11, color: c.textMuted)),
+          if (goal.targetDate != null) Text('by ${goal.targetDate}', style: TextStyle(fontSize: 11, color: c.textMuted)),
+        ]),
       ]),
     );
   }
@@ -535,5 +666,136 @@ Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
       note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
     );
     ref.invalidate(financeTransactionsProvider);
+  }
+}
+
+Future<void> _addRecurring(BuildContext context, WidgetRef ref) async {
+  final nameCtrl = TextEditingController();
+  final amountCtrl = TextEditingController();
+  final categories = ref.read(financeCategoriesProvider).valueOrNull ?? [];
+  String type = 'expense';
+  String frequency = 'monthly';
+  String? categoryId;
+  DateTime? nextDue;
+  final ok = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.colors.background,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: StatefulBuilder(builder: (ctx, setS) {
+        final c = ctx.colors;
+        final catOpts = categories.where((cat) => cat.kind == type).toList();
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Add subscription / bill', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+            const SizedBox(height: 16),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Name (e.g. Netflix, Rent)')),
+            const SizedBox(height: 12),
+            Row(children: [
+              for (final t in ['expense', 'income'])
+                Expanded(child: Padding(
+                  padding: EdgeInsets.only(right: t == 'expense' ? 8 : 0),
+                  child: ChoiceChip(label: Text(t == 'expense' ? 'Expense' : 'Income'), selected: type == t, onSelected: (_) => setS(() { type = t; categoryId = null; })),
+                )),
+            ]),
+            const SizedBox(height: 12),
+            TextField(controller: amountCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: 'Amount')),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: frequency,
+              items: kFrequencies.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+              onChanged: (v) => setS(() => frequency = v ?? 'monthly'),
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(nextDue == null ? 'Next due date (optional)' : DateFormat('MMM d, yyyy').format(nextDue!), style: TextStyle(color: nextDue == null ? c.textMuted : c.textPrimary)),
+              trailing: Icon(Icons.calendar_today_rounded, size: 18, color: c.textMuted),
+              onTap: () async {
+                final picked = await showDatePicker(context: ctx, initialDate: nextDue ?? DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+                if (picked != null) setS(() => nextDue = picked);
+              },
+            ),
+            if (catOpts.isNotEmpty)
+              DropdownButtonFormField<String?>(
+                initialValue: categoryId,
+                decoration: const InputDecoration(hintText: 'Category'),
+                items: [const DropdownMenuItem<String?>(value: null, child: Text('No category')), ...catOpts.map((cat) => DropdownMenuItem<String?>(value: cat.id, child: Text(cat.name)))],
+                onChanged: (v) => setS(() => categoryId = v),
+              ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: AppColors.emerald), child: const Text('Add')),
+          ]),
+        );
+      }),
+    ),
+  );
+  if (ok == true && nameCtrl.text.trim().isNotEmpty) {
+    await FinanceRepo.addRecurring(
+      name: nameCtrl.text.trim(),
+      amount: double.tryParse(amountCtrl.text) ?? 0,
+      type: type, frequency: frequency,
+      nextDue: nextDue != null ? DateFormat('yyyy-MM-dd').format(nextDue!) : null,
+      categoryId: categoryId,
+    );
+    ref.invalidate(financeRecurringProvider);
+  }
+}
+
+Future<void> _editGoal(BuildContext context, WidgetRef ref, FinanceGoal? goal) async {
+  final nameCtrl = TextEditingController(text: goal?.name ?? '');
+  final targetCtrl = TextEditingController(text: goal != null ? goal.targetAmount.toStringAsFixed(0) : '');
+  final currentCtrl = TextEditingController(text: goal != null ? goal.currentAmount.toStringAsFixed(0) : '');
+  DateTime? targetDate = goal?.targetDate != null ? DateTime.tryParse(goal!.targetDate!) : null;
+  final ok = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.colors.background,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: StatefulBuilder(builder: (ctx, setS) {
+        final c = ctx.colors;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(goal == null ? 'Add goal' : 'Edit goal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+            const SizedBox(height: 16),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Goal name (e.g. Emergency fund)')),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: TextField(controller: targetCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Target', prefixText: '\$ '))),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(controller: currentCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Saved', prefixText: '\$ '))),
+            ]),
+            const SizedBox(height: 4),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(targetDate == null ? 'Target date (optional)' : DateFormat('MMM d, yyyy').format(targetDate!), style: TextStyle(color: targetDate == null ? c.textMuted : c.textPrimary)),
+              trailing: Icon(Icons.calendar_today_rounded, size: 18, color: c.textMuted),
+              onTap: () async {
+                final picked = await showDatePicker(context: ctx, initialDate: targetDate ?? DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+                if (picked != null) setS(() => targetDate = picked);
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: AppColors.emerald), child: Text(goal == null ? 'Add goal' : 'Save')),
+          ]),
+        );
+      }),
+    ),
+  );
+  if (ok == true && nameCtrl.text.trim().isNotEmpty) {
+    await FinanceRepo.saveGoal(
+      id: goal?.id,
+      name: nameCtrl.text.trim(),
+      target: double.tryParse(targetCtrl.text) ?? 0,
+      current: double.tryParse(currentCtrl.text) ?? 0,
+      targetDate: targetDate != null ? DateFormat('yyyy-MM-dd').format(targetDate!) : null,
+    );
+    ref.invalidate(financeGoalsProvider);
   }
 }
