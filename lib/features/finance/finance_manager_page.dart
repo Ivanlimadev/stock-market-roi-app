@@ -89,10 +89,26 @@ class _Dashboard extends ConsumerWidget {
     final income = month.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
     final expense = month.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
 
+    final categories = ref.watch(financeCategoriesProvider).valueOrNull ?? [];
+    final budgets = ref.watch(financeBudgetsProvider).valueOrNull ?? [];
+    final catName = {for (final c in categories) c.id: c.name};
+    final spentByCat = <String, double>{};
+    for (final t in month) {
+      if (t.type == 'expense' && t.categoryId != null) {
+        spentByCat[t.categoryId!] = (spentByCat[t.categoryId!] ?? 0) + t.amount;
+      }
+    }
+    final budgetRows = budgets
+        .map((b) => (b: b, name: catName[b.categoryId] ?? '—', spent: spentByCat[b.categoryId] ?? 0.0))
+        .toList()
+      ..sort((a, b) => (b.spent / (b.b.amount == 0 ? 1 : b.b.amount)).compareTo(a.spent / (a.b.amount == 0 ? 1 : a.b.amount)));
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(financeAccountsProvider);
         ref.invalidate(financeTransactionsProvider);
+        ref.invalidate(financeCategoriesProvider);
+        ref.invalidate(financeBudgetsProvider);
       },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -130,6 +146,14 @@ class _Dashboard extends ConsumerWidget {
                 })),
 
           const SizedBox(height: 24),
+          _SectionHeader(title: 'Budgets · this month', action: 'Manage', onAction: () => _manageBudgets(context, ref, categories, budgets)),
+          const SizedBox(height: 8),
+          if (budgetRows.isEmpty)
+            _Empty('No budgets yet. Tap “Manage” to set a monthly limit per category.')
+          else
+            ...budgetRows.map((r) => _BudgetTile(name: r.name, spent: r.spent, limit: r.b.amount)),
+
+          const SizedBox(height: 24),
           _SectionHeader(title: 'Recent transactions'),
           const SizedBox(height: 8),
           if (txnsAsync.isLoading)
@@ -137,10 +161,14 @@ class _Dashboard extends ConsumerWidget {
           else if (txns.isEmpty)
             _Empty('No transactions yet. Tap “Transaction” to log your first one.')
           else
-            ...txns.take(15).map((t) => _TxnTile(txn: t, onDelete: () async {
-                  await FinanceRepo.deleteTransaction(t.id);
-                  ref.invalidate(financeTransactionsProvider);
-                })),
+            ...txns.take(15).map((t) => _TxnTile(
+                  txn: t,
+                  categoryName: t.categoryId != null ? catName[t.categoryId] : null,
+                  onDelete: () async {
+                    await FinanceRepo.deleteTransaction(t.id);
+                    ref.invalidate(financeTransactionsProvider);
+                  },
+                )),
         ],
       ),
     );
@@ -258,8 +286,9 @@ class _AccountTile extends StatelessWidget {
 
 class _TxnTile extends StatelessWidget {
   final FinanceTransaction txn;
+  final String? categoryName;
   final VoidCallback onDelete;
-  const _TxnTile({required this.txn, required this.onDelete});
+  const _TxnTile({required this.txn, this.categoryName, required this.onDelete});
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -274,7 +303,7 @@ class _TxnTile extends StatelessWidget {
         ),
         title: Text(txn.note?.isNotEmpty == true ? txn.note! : (income ? 'Income' : 'Expense'),
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.textPrimary)),
-        subtitle: Text(txn.date, style: TextStyle(fontSize: 11, color: c.textMuted)),
+        subtitle: Text('${txn.date}${categoryName != null ? ' · $categoryName' : ''}', style: TextStyle(fontSize: 11, color: c.textMuted)),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           Text('${income ? '+' : '-'}${_money.format(txn.amount)}',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: income ? AppColors.emerald : c.textPrimary)),
@@ -285,7 +314,101 @@ class _TxnTile extends StatelessWidget {
   }
 }
 
+class _BudgetTile extends StatelessWidget {
+  final String name;
+  final double spent;
+  final double limit;
+  const _BudgetTile({required this.name, required this.spent, required this.limit});
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final pct = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
+    final over = spent > limit;
+    final color = over ? AppColors.red : (pct > 0.8 ? AppColors.orange : AppColors.emerald);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.surfaceAlt)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: c.textPrimary)),
+          Text('${_money.format(spent)} / ${_money.format(limit)}', style: TextStyle(fontSize: 12, color: over ? AppColors.red : c.textMuted)),
+        ]),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(value: pct, minHeight: 6, backgroundColor: c.surfaceAlt, color: color),
+        ),
+      ]),
+    );
+  }
+}
+
 // ── Add sheets ────────────────────────────────────────────────────────────────
+
+Future<void> _manageBudgets(BuildContext context, WidgetRef ref, List<FinanceCategory> categories, List<FinanceBudget> budgets) async {
+  final expenseCats = categories.where((c) => c.kind == 'expense').toList();
+  final original = {for (final b in budgets) b.categoryId: b.amount};
+  final ctrls = {for (final c in expenseCats) c.id: TextEditingController(text: original[c.id] != null ? original[c.id]!.toStringAsFixed(0) : '')};
+  final saved = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.colors.background,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        builder: (ctx, scroll) {
+          final c = ctx.colors;
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(children: [
+                Text('Monthly budgets', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.textPrimary)),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.emerald),
+                  child: const Text('Save'),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), children: [
+                for (final cat in expenseCats)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(children: [
+                      Expanded(child: Text(cat.name, style: TextStyle(fontSize: 14, color: c.textPrimary))),
+                      SizedBox(
+                        width: 110,
+                        child: TextField(
+                          controller: ctrls[cat.id],
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.right,
+                          decoration: const InputDecoration(prefixText: '\$ ', hintText: '0'),
+                        ),
+                      ),
+                    ]),
+                  ),
+              ]),
+            ),
+          ]);
+        },
+      ),
+    ),
+  );
+  if (saved == true) {
+    for (final cat in expenseCats) {
+      final v = double.tryParse(ctrls[cat.id]!.text) ?? 0;
+      if (v != (original[cat.id] ?? 0)) await FinanceRepo.setBudget(cat.id, v);
+    }
+    ref.invalidate(financeBudgetsProvider);
+  }
+}
 
 Future<void> _addAccount(BuildContext context, WidgetRef ref) async {
   final nameCtrl = TextEditingController();
@@ -334,7 +457,9 @@ Future<void> _addAccount(BuildContext context, WidgetRef ref) async {
 Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
   final amountCtrl = TextEditingController();
   final noteCtrl = TextEditingController();
+  final categories = ref.read(financeCategoriesProvider).valueOrNull ?? [];
   String type = 'expense';
+  String? categoryId;
   DateTime date = DateTime.now();
   final ok = await showModalBottomSheet<bool>(
     context: context,
@@ -357,7 +482,7 @@ Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
                   child: ChoiceChip(
                     label: Text(t == 'expense' ? 'Expense' : 'Income'),
                     selected: type == t,
-                    onSelected: (_) => setS(() => type = t),
+                    onSelected: (_) => setS(() { type = t; categoryId = null; }),
                   ),
                 )),
             ]),
@@ -373,6 +498,22 @@ Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
                 if (picked != null) setS(() => date = picked);
               },
             ),
+            Builder(builder: (ctx) {
+              final catOpts = categories.where((c) => c.kind == type).toList();
+              if (catOpts.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String?>(
+                  initialValue: categoryId,
+                  decoration: const InputDecoration(hintText: 'Category'),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('No category')),
+                    ...catOpts.map((c) => DropdownMenuItem<String?>(value: c.id, child: Text(c.name))),
+                  ],
+                  onChanged: (v) => setS(() => categoryId = v),
+                ),
+              );
+            }),
             TextField(controller: noteCtrl, decoration: const InputDecoration(hintText: 'Note (optional)')),
             const SizedBox(height: 16),
             FilledButton(
@@ -390,6 +531,7 @@ Future<void> _addTransaction(BuildContext context, WidgetRef ref) async {
     await FinanceRepo.addTransaction(
       type: type, amount: amt,
       date: DateFormat('yyyy-MM-dd').format(date),
+      categoryId: categoryId,
       note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
     );
     ref.invalidate(financeTransactionsProvider);
