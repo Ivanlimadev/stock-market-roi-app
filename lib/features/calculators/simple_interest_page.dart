@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import 'calc_widgets.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 final _usd = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 2);
 const _blue = Color(0xFF3B82F6);
@@ -61,6 +62,7 @@ class _SimpleInterestPageState extends State<SimpleInterestPage> {
     final principal = double.tryParse(_principalCtrl.text) ?? 0;
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Simple Interest')),
       body: SafeArea(
         child: SingleChildScrollView(

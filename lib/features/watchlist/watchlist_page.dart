@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/shell/main_shell.dart';
 import '../../core/providers/watchlist_provider.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 class WatchlistPage extends ConsumerWidget {
   const WatchlistPage({super.key});
@@ -17,7 +19,11 @@ class WatchlistPage extends ConsumerWidget {
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Watchlist')),
+        bottomNavigationBar: const AppBottomNav(),
+        appBar: AppBar(
+          title: const Text('Watchlist'),
+          actions: MainShellMenu.actions(),
+        ),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -48,6 +54,7 @@ class WatchlistPage extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Watchlist'),
+          actions: MainShellMenu.actions(),
           bottom: TabBar(
             labelColor: AppColors.emerald,
             indicatorColor: AppColors.emerald,

@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 
 class AppFooter extends StatelessWidget {
   const AppFooter({super.key});
-
-  void _open(String path) => launchUrl(
-    Uri.parse('https://stockmarketroi.com$path'),
-    mode: LaunchMode.externalApplication,
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -53,13 +49,13 @@ class AppFooter extends StatelessWidget {
           Row(
             children: [
               _FooterLink(icon: Icons.info_outline_rounded,   label: 'About Us',
-                  onTap: () => _open('/about')),
+                  onTap: () => context.push('/about')),
               SizedBox(width: 16),
               _FooterLink(icon: Icons.shield_outlined,        label: 'Privacy Policy',
-                  onTap: () => _open('/privacy')),
+                  onTap: () => context.push('/privacy')),
               SizedBox(width: 16),
               _FooterLink(icon: Icons.description_outlined,   label: 'Terms of Use',
-                  onTap: () => _open('/terms')),
+                  onTap: () => context.push('/terms')),
             ],
           ),
 

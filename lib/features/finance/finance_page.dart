@@ -90,15 +90,7 @@ class _FinancePageState extends ConsumerState<FinancePage>
       bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(
         title: Text('Calendar'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.public_rounded),
-            tooltip: 'US Economy',
-            onPressed: () => context.push('/us-macro'),
-          ),
-          MainShellMenu.themeButton(),
-          MainShellMenu.settingsButton(),
-        ],
+        actions: MainShellMenu.actions(),
         bottom: TabBar(
           controller: _tab,
           indicatorColor: AppColors.emerald,

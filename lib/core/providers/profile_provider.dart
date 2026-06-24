@@ -1,6 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../services/local_avatar_service.dart';
+
+/// The signed-in user's locally-stored profile photo (device-only), or null.
+/// Invalidate this after [LocalAvatarService.pickAndSave]/remove to refresh.
+final localAvatarProvider = FutureProvider.autoDispose<File?>((ref) async {
+  // React to sign-in/out so the avatar clears on logout.
+  ref.watch(profileProvider);
+  return LocalAvatarService.currentFile();
+});
 
 class UserProfile {
   final String id;

@@ -63,8 +63,19 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.4.14
   riverpod_generator: ^2.6.1
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - shorebird.yaml
+
+# App launcher icon — green trending-up arrow on black (matches stockmarketroi.com favicon)
+flutter_launcher_icons:
+  image_path: "assets/branding/icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  adaptive_icon_background: "#09090b"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"

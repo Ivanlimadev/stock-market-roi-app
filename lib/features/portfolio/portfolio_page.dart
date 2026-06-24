@@ -74,23 +74,16 @@ class _LoggedInPortfolioState extends ConsumerState<_LoggedInPortfolio>
     super.dispose();
   }
 
-  void _refresh() {
-    ref.invalidate(portfolioHoldingsProvider);
-    ref.invalidate(portfolioEnrichedProvider);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Portfolio'),
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded),
-            onPressed: _refresh,
-          ),
+          MainShellMenu.searchButton(),
           MainShellMenu.themeButton(),
           MainShellMenu.settingsButton(),
+          MainShellMenu.avatarButton(),
         ],
         bottom: TabBar(
           controller: _tab,

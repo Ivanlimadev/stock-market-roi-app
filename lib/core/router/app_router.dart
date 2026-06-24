@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/login_page.dart';
 import '../../features/auth/register_page.dart';
 import '../../features/auth/forgot_password_page.dart';
+import '../../features/onboarding/photo_onboarding_page.dart';
 import '../../features/home/home_page.dart';
 import '../../features/stocks/stock_detail_page.dart';
 import '../../features/finance/finance_page.dart';
@@ -32,20 +34,46 @@ import '../../features/editorial/editorial_rankings_page.dart';
 import '../../features/finance/us_macro_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/settings/notifications_page.dart';
+import '../../features/legal/web_view_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
 
+/// Re-runs the router's [redirect] whenever the Supabase auth state changes
+/// (sign-in, sign-out, token refresh/expiry) so the login gate stays in sync.
+class _AuthRefresh extends ChangeNotifier {
+  _AuthRefresh() {
+    _sub = Supabase.instance.client.auth.onAuthStateChange
+        .listen((_) => notifyListeners());
+  }
+  late final StreamSubscription<AuthState> _sub;
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}
+
 final appRouter = GoRouter(
   navigatorKey: _rootKey,
   initialLocation: '/home',
+  refreshListenable: _AuthRefresh(),
   redirect: (context, state) {
-    final session  = Supabase.instance.client.auth.currentSession;
-    final isAuth   = session != null;
-    final isOnAuth = state.matchedLocation.startsWith('/login') ||
-        state.matchedLocation.startsWith('/register') ||
-        state.matchedLocation.startsWith('/forgot-password');
+    final isAuth = Supabase.instance.client.auth.currentSession != null;
+    final loc    = state.matchedLocation;
 
+    final isOnAuth = loc.startsWith('/login') ||
+        loc.startsWith('/register') ||
+        loc.startsWith('/forgot-password');
+    // Legal pages stay reachable pre-login (linked from sign-up).
+    final isPublic = isOnAuth ||
+        loc.startsWith('/privacy') ||
+        loc.startsWith('/terms');
+
+    // Logged out → force the login screen before anything else.
+    if (!isAuth && !isPublic) return '/login';
+    // Logged in → keep auth screens out of reach.
     if (isAuth && isOnAuth) return '/home';
     return null;
   },
@@ -55,9 +83,20 @@ final appRouter = GoRouter(
     GoRoute(path: '/register',        builder: (_, $) => const RegisterPage()),
     GoRoute(path: '/forgot-password', builder: (_, $) => const ForgotPasswordPage()),
 
+    // Photo onboarding — shown once after the first sign-in (outside shell)
+    GoRoute(path: '/onboarding/photo', builder: (_, $) => const PhotoOnboardingPage()),
+
     // Settings — outside shell (full screen, back button)
     GoRoute(path: '/settings',  builder: (_, $) => const SettingsPage()),
     GoRoute(path: '/settings/notifications', builder: (_, $) => const NotificationsPage()),
+
+    // Legal / About — in-app web views (kept inside the app, no external browser)
+    GoRoute(path: '/privacy', builder: (_, $) => const WebViewPage(
+        title: 'Privacy Policy', url: 'https://stockmarketroi.com/privacy')),
+    GoRoute(path: '/terms', builder: (_, $) => const WebViewPage(
+        title: 'Terms of Use', url: 'https://stockmarketroi.com/terms')),
+    GoRoute(path: '/about', builder: (_, $) => const WebViewPage(
+        title: 'About', url: 'https://stockmarketroi.com/about')),
 
     // My Account — outside shell (avoids a 2nd MainShell / duplicate scaffoldKey
     // when pushed on top of a shell route from Settings)

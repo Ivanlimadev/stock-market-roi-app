@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import 'calc_widgets.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 const _violet = Color(0xFF8B5CF6);
 
@@ -52,6 +53,7 @@ class _PercentagePageState extends State<PercentagePage> {
     final c = context.colors;
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Percentage')),
       body: SafeArea(
         child: SingleChildScrollView(

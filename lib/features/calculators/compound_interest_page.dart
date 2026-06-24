@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import 'calc_widgets.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 final _usd = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 0);
 
@@ -95,6 +96,7 @@ class _CompoundInterestPageState extends State<CompoundInterestPage> {
     final atAge  = age > 0 && years > 0 ? 'at age ${age + years}' : null;
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Compound Interest')),
       body: SafeArea(
         child: SingleChildScrollView(

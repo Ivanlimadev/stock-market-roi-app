@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Editorial list definitions ────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ class EditorialHubPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Editorial Rankings')),
       body: SafeArea(
         child: ListView(
@@ -151,6 +153,7 @@ class EditorialListPage extends ConsumerWidget {
     final c = context.colors;
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: Text(ed.title)),
       body: SafeArea(
         child: async.when(

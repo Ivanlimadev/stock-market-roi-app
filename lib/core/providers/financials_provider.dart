@@ -85,6 +85,74 @@ class SecFiling {
   );
 }
 
+class InsiderTx {
+  final String date;
+  final String owner;
+  final String role;
+  final String code;
+  final String type; // buy | sell | award | option | tax | gift | other
+  final double? shares;
+  final double? price;
+  final double? value;
+
+  const InsiderTx({
+    required this.date,
+    required this.owner,
+    required this.role,
+    required this.code,
+    required this.type,
+    this.shares,
+    this.price,
+    this.value,
+  });
+
+  factory InsiderTx.fromJson(Map<String, dynamic> j) => InsiderTx(
+    date:   j['date'] as String? ?? '',
+    owner:  j['owner'] as String? ?? 'Insider',
+    role:   j['role'] as String? ?? '—',
+    code:   j['code'] as String? ?? '',
+    type:   j['type'] as String? ?? 'other',
+    shares: (j['shares'] as num?)?.toDouble(),
+    price:  (j['price'] as num?)?.toDouble(),
+    value:  (j['value'] as num?)?.toDouble(),
+  );
+}
+
+class InsiderData {
+  final List<InsiderTx> transactions;
+  final int months;
+  final int buys;
+  final int sells;
+  final double buyValue;
+  final double sellValue;
+  final double netValue;
+
+  const InsiderData({
+    required this.transactions,
+    required this.months,
+    required this.buys,
+    required this.sells,
+    required this.buyValue,
+    required this.sellValue,
+    required this.netValue,
+  });
+
+  factory InsiderData.fromJson(Map<String, dynamic> j) {
+    final s = (j['summary'] as Map<String, dynamic>?) ?? const {};
+    return InsiderData(
+      transactions: (j['transactions'] as List? ?? [])
+          .map((e) => InsiderTx.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      months:    (s['months'] as num?)?.toInt() ?? 6,
+      buys:      (s['buys'] as num?)?.toInt() ?? 0,
+      sells:     (s['sells'] as num?)?.toInt() ?? 0,
+      buyValue:  (s['buyValue'] as num?)?.toDouble() ?? 0,
+      sellValue: (s['sellValue'] as num?)?.toDouble() ?? 0,
+      netValue:  (s['netValue'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
 class ExchangeTicker {
   final String exchange;
   final String target;
@@ -228,6 +296,12 @@ final stockFilingsProvider = FutureProvider.autoDispose
   return (json as List)
       .map((e) => SecFiling.fromJson(e as Map<String, dynamic>))
       .toList();
+});
+
+final stockInsidersProvider = FutureProvider.autoDispose
+    .family<InsiderData, String>((ref, symbol) async {
+  final json = await ApiClient.get('/stocks/insiders?symbol=$symbol');
+  return InsiderData.fromJson(json as Map<String, dynamic>);
 });
 
 final cryptoTickersProvider = FutureProvider.autoDispose

@@ -16,12 +16,13 @@ Future<void> main() async {
   );
   const supabaseKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_O9J-hDKHWgUQfOIFxaN1wA_eRbimHqy',
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nYnJhbXZ6cW1ia2l6c3BlY2NnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODA4NjksImV4cCI6MjA5Njg1Njg2OX0.Gbd7Fgyqici5rXvO30dWsIVKJNgdA50JzB67eXPAeh4',
   );
 
   await Supabase.initialize(
-    url:            supabaseUrl,
-    publishableKey: supabaseKey,
+    url:     supabaseUrl,
+    anonKey: supabaseKey,
   );
 
   await Firebase.initializeApp();

@@ -9,6 +9,7 @@ import '../../core/models/crypto_model.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/providers/realtime_price_provider.dart';
 import '../../core/shell/main_shell.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 class CryptoPage extends ConsumerStatefulWidget {
   const CryptoPage({super.key});
@@ -36,6 +37,7 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       body: RefreshIndicator(
         color: AppColors.emerald,
         onRefresh: () async => _refresh(),
@@ -51,12 +53,10 @@ class _CryptoPageState extends ConsumerState<CryptoPage>
               ),
               title: Text('Crypto Market'),
               actions: [
-                IconButton(
-                  icon: Icon(Icons.refresh_rounded),
-                  onPressed: _refresh,
-                ),
+                MainShellMenu.searchButton(),
                 MainShellMenu.themeButton(),
                 MainShellMenu.settingsButton(),
+                MainShellMenu.avatarButton(),
               ],
             ),
 

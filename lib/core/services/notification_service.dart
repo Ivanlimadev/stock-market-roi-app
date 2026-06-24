@@ -43,6 +43,23 @@ class NotificationService {
 
     // Register FCM token whenever it changes (first run + token rotation)
     FirebaseMessaging.instance.onTokenRefresh.listen((_) => _saveToken());
+
+    // Register/refresh the token on every auth change. Crucial because the app
+    // starts on the forced-login screen (no session), so the initial _saveToken
+    // below is a no-op — the token must be (re)saved once the user signs in.
+    Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+      switch (state.event) {
+        case AuthChangeEvent.signedIn:
+        case AuthChangeEvent.initialSession:
+        case AuthChangeEvent.tokenRefreshed:
+          _saveToken();
+        case AuthChangeEvent.signedOut:
+          _removeToken();
+        default:
+          break;
+      }
+    });
+
     await _saveToken();
   }
 
@@ -50,7 +67,9 @@ class NotificationService {
   static Future<void> onLogin() => _saveToken();
 
   // Called on logout — removes this device's token from Supabase
-  static Future<void> onLogout() async {
+  static Future<void> onLogout() => _removeToken();
+
+  static Future<void> _removeToken() async {
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) return;
     await Supabase.instance.client
@@ -62,11 +81,12 @@ class NotificationService {
   // ── Private ──────────────────────────────────────────────────────────────
 
   static Future<void> _requestPermission() async {
-    await FirebaseMessaging.instance.requestPermission(
+    final settings = await FirebaseMessaging.instance.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+    print('[FCM] permission status: ${settings.authorizationStatus}');
     // iOS foreground notifications must be explicitly enabled
     await FirebaseMessaging.instance
         .setForegroundNotificationPresentationOptions(
@@ -162,19 +182,40 @@ class NotificationService {
 
   static Future<void> _saveToken() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      print('[FCM] _saveToken: no logged-in user, skipping');
+      return;
+    }
 
-    final token = await FirebaseMessaging.instance.getToken();
+    if (Platform.isIOS) {
+      final apns = await FirebaseMessaging.instance.getAPNSToken();
+      print('[FCM] APNS token: ${apns == null ? "NULL (not ready)" : "present"}');
+    }
+
+    String? token;
+    try {
+      token = await FirebaseMessaging.instance.getToken();
+    } catch (e) {
+      print('[FCM] getToken() threw: $e');
+      return;
+    }
+    print('[FCM] _saveToken user=${user.id} '
+        'token=${token == null ? "NULL" : "${token.substring(0, 12)}…"}');
     if (token == null) return;
 
-    await Supabase.instance.client.from('user_fcm_tokens').upsert(
-      {
-        'user_id': user.id,
-        'token': token,
-        'platform': Platform.isIOS ? 'ios' : 'android',
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      onConflict: 'user_id,token',
-    );
+    try {
+      await Supabase.instance.client.from('user_fcm_tokens').upsert(
+        {
+          'user_id': user.id,
+          'token': token,
+          'platform': Platform.isIOS ? 'ios' : 'android',
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'user_id,token',
+      );
+      print('[FCM] token upsert OK ✅');
+    } catch (e) {
+      print('[FCM] upsert error: $e');
+    }
   }
 }

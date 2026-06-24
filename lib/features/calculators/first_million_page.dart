@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import 'calc_widgets.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 final _usd  = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 0);
 final _usd2 = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 2);
@@ -124,6 +125,7 @@ class _FirstMillionPageState extends State<FirstMillionPage> {
     final c = context.colors;
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('First Million')),
       body: SafeArea(
         child: SingleChildScrollView(

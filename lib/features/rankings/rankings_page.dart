@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/shell/main_shell.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Derived providers for top 20 ──────────────────────────────────────────────
 
@@ -54,8 +56,10 @@ class RankingsPage extends ConsumerWidget {
     return DefaultTabController(
       length: 5,
       child: Scaffold(
+        bottomNavigationBar: const AppBottomNav(),
         appBar: AppBar(
           title: const Text('Rankings'),
+          actions: MainShellMenu.actions(),
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,

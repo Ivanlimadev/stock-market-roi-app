@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 class CalculatorsHubPage extends StatelessWidget {
   const CalculatorsHubPage({super.key});
@@ -60,6 +61,7 @@ class CalculatorsHubPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Calculators')),
       body: SafeArea(
         child: CustomScrollView(

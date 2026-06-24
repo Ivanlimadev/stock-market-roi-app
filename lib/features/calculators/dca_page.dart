@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import 'calc_widgets.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 final _usd = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 0);
 const _cyan = Color(0xFF06B6D4);
@@ -108,6 +109,7 @@ class _DCAPageState extends State<DCAPage> {
     final dcaWins  = (_dcaFinal ?? 0) >= (_lumpSumFinal ?? 0);
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('DCA Calculator')),
       body: SafeArea(
         child: SingleChildScrollView(

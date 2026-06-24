@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Row definitions ───────────────────────────────────────────────────────────
 
@@ -129,6 +130,7 @@ class _ComparePageState extends ConsumerState<ComparePage> {
     final async = ref.watch(screenerProvider);
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Compare Stocks')),
       body: SafeArea(
         child: Column(

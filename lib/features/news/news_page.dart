@@ -56,12 +56,10 @@ class _NewsPageState extends ConsumerState<NewsPage>
       appBar: AppBar(
         title: Text('News'),
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(blogPostsProvider),
-          ),
+          MainShellMenu.searchButton(),
           MainShellMenu.themeButton(),
           MainShellMenu.settingsButton(),
+          MainShellMenu.avatarButton(),
         ],
         bottom: TabBar(
           controller: _tab,

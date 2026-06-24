@@ -14,15 +14,30 @@ class _RegisterPageState extends State<RegisterPage> {
   final _name     = TextEditingController();
   final _email    = TextEditingController();
   final _password = TextEditingController();
+  final _pwFocus  = FocusNode();
   bool _loading         = false;
   bool _showPw          = false;
   bool _done            = false;
   bool _emailSubscribed = true;
   String? _error;
 
+  // ── Password policy (matches the website): min 8 chars, 1 uppercase,
+  //    1 lowercase, 1 number, 1 special character ───────────────────────────
+  bool get _pwMinLen  => _password.text.length >= 8;
+  bool get _pwUpper   => _password.text.contains(RegExp(r'[A-Z]'));
+  bool get _pwLower   => _password.text.contains(RegExp(r'[a-z]'));
+  bool get _pwNumber  => _password.text.contains(RegExp(r'[0-9]'));
+  bool get _pwSpecial => _password.text.contains(RegExp(r'[^A-Za-z0-9]'));
+  bool get _pwValid =>
+      _pwMinLen && _pwUpper && _pwLower && _pwNumber && _pwSpecial;
+
   Future<void> _register() async {
     if (_name.text.trim().isEmpty) {
       setState(() => _error = 'Please enter your name.');
+      return;
+    }
+    if (!_pwValid) {
+      setState(() => _error = 'Your password does not meet all requirements.');
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -42,10 +57,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Reveal the requirements checklist as soon as the field is focused.
+    _pwFocus.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _pwFocus.dispose();
     super.dispose();
   }
 
@@ -133,7 +156,9 @@ class _RegisterPageState extends State<RegisterPage> {
               SizedBox(height: 16),
               TextField(
                 controller: _password,
+                focusNode: _pwFocus,
                 obscureText: !_showPw,
+                onChanged: (_) => setState(() {}),
                 style: TextStyle(color: context.colors.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Password',
@@ -144,6 +169,14 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
               ),
+              if (_pwFocus.hasFocus || _password.text.isNotEmpty) ...[
+                SizedBox(height: 12),
+                _PwRule(met: _pwMinLen,  label: 'At least 8 characters'),
+                _PwRule(met: _pwUpper,   label: 'One uppercase letter (A–Z)'),
+                _PwRule(met: _pwLower,   label: 'One lowercase letter (a–z)'),
+                _PwRule(met: _pwNumber,  label: 'One number (0–9)'),
+                _PwRule(met: _pwSpecial, label: 'One special character (!@#\$…)'),
+              ],
               if (_error != null) ...[
                 SizedBox(height: 12),
                 Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
@@ -194,6 +227,29 @@ class _RegisterPageState extends State<RegisterPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A single password-requirement row that turns green when satisfied.
+class _PwRule extends StatelessWidget {
+  final bool met;
+  final String label;
+  const _PwRule({required this.met, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = met ? AppColors.emerald : context.colors.textMuted;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(met ? Icons.check_circle_rounded : Icons.circle_outlined,
+              size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(fontSize: 12.5, color: color)),
+        ],
       ),
     );
   }

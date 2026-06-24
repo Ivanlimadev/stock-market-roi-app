@@ -7,6 +7,7 @@ import '../../core/providers/market_provider.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/providers/crypto_provider.dart';
 import '../../core/providers/blog_provider.dart';
+import '../../core/providers/watchlist_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/models/crypto_model.dart';
 import '../../core/models/blog_post_model.dart';
@@ -61,8 +62,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     final screener   = ref.watch(screenerProvider);
     final cryptoData = ref.watch(cryptoMarketsProvider);
 
+    // Lets the shared search button (from any tab) open search here.
+    ref.listen(searchTriggerProvider, (_, __) {
+      if (mounted && !_searching) setState(() => _searching = true);
+    });
+
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: _searching ? 4 : NavigationToolbar.kMiddleSpacing,
         title: _searching
             ? TextField(
                 controller: _searchCtrl,
@@ -90,19 +97,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               icon: Icon(Icons.search_rounded),
               onPressed: () => setState(() => _searching = true),
             ),
-            IconButton(
-              icon: Icon(Icons.refresh_rounded),
-              onPressed: () {
-                ref.invalidate(marketOverviewProvider);
-                ref.invalidate(screenerProvider);
-                ref.invalidate(cryptoMarketsProvider);
-                ref.invalidate(blogPostsProvider);
-                ref.invalidate(_calEarningsProvider);
-                ref.invalidate(_calDividendsProvider);
-              },
-            ),
             MainShellMenu.themeButton(),
             MainShellMenu.settingsButton(),
+            MainShellMenu.avatarButton(),
           ],
         ],
       ),
@@ -115,27 +112,31 @@ class _HomePageState extends ConsumerState<HomePage> {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-class _SearchResults extends StatelessWidget {
+class _SearchResults extends ConsumerWidget {
   final String query;
   final AsyncValue<List<StockQuote>> screener;
   final AsyncValue<List<CryptoMarket>> crypto;
-  const _SearchResults({required this.query, required this.screener, required this.crypto});
+  const _SearchResults(
+      {required this.query, required this.screener, required this.crypto});
 
   @override
-  Widget build(BuildContext context) {
-    if (query.isEmpty) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    if (query.trim().isEmpty) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.search_rounded, size: 48, color: context.colors.surfaceAlt),
-          SizedBox(height: 12),
-          Text('Search stocks and crypto', style: TextStyle(color: context.colors.textMuted)),
+          Icon(Icons.search_rounded, size: 48, color: c.surfaceAlt),
+          const SizedBox(height: 12),
+          Text('Search stocks, crypto and articles',
+              style: TextStyle(color: c.textMuted)),
         ]),
       );
     }
 
     final q = query.toLowerCase();
     int score(String sym, String name) {
-      final s = sym.toLowerCase(); final n = name.toLowerCase();
+      final s = sym.toLowerCase();
+      final n = name.toLowerCase();
       if (s == q) return 4;
       if (s.startsWith(q)) return 3;
       if (n.startsWith(q)) return 2;
@@ -143,52 +144,193 @@ class _SearchResults extends StatelessWidget {
       return 0;
     }
 
-    final items = <({Widget Function(BuildContext) build, int score})>[];
-    for (final s in (screener.valueOrNull ?? [])) {
+    // 1) Matching assets — top 10 (5 + 5 in a 2-column grid).
+    final scored = <({Widget card, int score})>[];
+    for (final s in (screener.valueOrNull ?? <StockQuote>[])) {
       final sc = score(s.symbol, s.name);
-      if (sc > 0) items.add((build: (_) => _StockTile(stock: s), score: sc));
+      if (sc > 0) {
+        scored.add((
+          card: _AssetCard(
+            logo: _Logo(symbol: s.symbol, size: 34, radius: 9),
+            symbol: s.symbol,
+            name: s.name,
+            price: fmtStockPrice(s.price),
+            changePct: s.changePct,
+            onTap: () => context.push('/stocks/${s.symbol}'),
+          ),
+          score: sc,
+        ));
+      }
     }
-    for (final c in (crypto.valueOrNull ?? [])) {
-      final sc = score(c.symbol, c.name);
-      if (sc > 0) items.add((build: (_) => _CryptoTile(coin: c), score: sc));
+    for (final cm in (crypto.valueOrNull ?? <CryptoMarket>[])) {
+      final sc = score(cm.symbol, cm.name);
+      if (sc > 0) {
+        scored.add((
+          card: _AssetCard(
+            logo: _CoinLogo(image: cm.image, symbol: cm.symbol),
+            symbol: cm.symbol.toUpperCase(),
+            name: cm.name,
+            price: fmtCryptoPrice(cm.currentPrice),
+            changePct: cm.priceChangePercentage24h,
+            onTap: () => context.push('/crypto/${cm.id}'),
+          ),
+          score: sc,
+        ));
+      }
+    }
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    final assetCards = scored.take(10).map((e) => e.card).toList();
+
+    // 2) Favorites (watchlist) — up to 10.
+    final favs = (ref.watch(watchlistProvider).valueOrNull ?? <WatchlistItem>[])
+        .take(10)
+        .toList();
+
+    // 3) Related articles — blog posts matching the query.
+    final posts = (ref.watch(blogPostsProvider).valueOrNull ?? <BlogPost>[])
+        .where((p) =>
+            p.title.toLowerCase().contains(q) ||
+            p.category.toLowerCase().contains(q) ||
+            (p.excerpt ?? '').toLowerCase().contains(q) ||
+            (p.tickers ?? const <String>[])
+                .any((t) => t.toLowerCase().contains(q)))
+        .take(6)
+        .toList();
+
+    if (assetCards.isEmpty && favs.isEmpty && posts.isEmpty) {
+      return Center(
+        child: Text('No results for "$query"',
+            style: TextStyle(color: c.textMuted)),
+      );
     }
 
-    if (items.isEmpty) {
-      return Center(child: Text('No results for "$query"',
-          style: TextStyle(color: context.colors.textMuted)));
-    }
-    items.sort((a, b) => b.score.compareTo(a.score));
+    final cardW = (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2;
+    Widget grid(List<Widget> cards) => Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [for (final w in cards) SizedBox(width: cardW, child: w)],
+        );
 
-    return ListView.builder(
+    return ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      itemCount: items.length,
-      itemBuilder: (ctx, i) => items[i].build(ctx),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: [
+        if (assetCards.isNotEmpty) ...[
+          const _SearchSection('Results'),
+          grid(assetCards),
+        ],
+        if (favs.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const _SearchSection('Favorites'),
+          grid([for (final f in favs) _FavCard(item: f)]),
+        ],
+        if (posts.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const _SearchSection('Related articles'),
+          for (final p in posts) _SearchPostCard(post: p),
+        ],
+      ],
     );
   }
 }
 
-class _StockTile extends StatelessWidget {
-  final StockQuote stock;
-  const _StockTile({required this.stock});
+class _SearchSection extends StatelessWidget {
+  final String title;
+  const _SearchSection(this.title);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 10),
+        child: Text(title.toUpperCase(),
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                color: context.colors.textMuted)),
+      );
+}
+
+class _CoinLogo extends StatelessWidget {
+  final String image, symbol;
+  const _CoinLogo({required this.image, required this.symbol});
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: Image.network(image, width: 34, height: 34,
+            errorBuilder: (_, __, ___) => Container(
+                  width: 34,
+                  height: 34,
+                  color: context.colors.surfaceAlt,
+                  child: Center(
+                      child: Text(symbol.toUpperCase().substring(0, 1),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: context.colors.textMuted))),
+                )),
+      );
+}
+
+class _AssetCard extends StatelessWidget {
+  final Widget logo;
+  final String symbol, name, price;
+  final double changePct;
+  final VoidCallback onTap;
+  const _AssetCard({
+    required this.logo,
+    required this.symbol,
+    required this.name,
+    required this.price,
+    required this.changePct,
+    required this.onTap,
+  });
   @override
   Widget build(BuildContext context) {
-    final up = stock.changePct >= 0;
-    final color = up ? AppColors.emerald : AppColors.red;
+    final c = context.colors;
+    final color = changePct >= 0 ? AppColors.emerald : AppColors.red;
     return InkWell(
-      onTap: () => context.push('/stocks/${stock.symbol}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(children: [
-          _Logo(symbol: stock.symbol, size: 40, radius: 10),
-          SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(stock.symbol, style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
-            Text(stock.name, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(fmtStockPrice(stock.price), style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
-            SizedBox(height: 2),
-            _ChangeBadge(value: stock.changePct, color: color),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.surfaceAlt),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            logo,
+            const SizedBox(width: 10),
+            Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(symbol,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: c.textPrimary)),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: c.textMuted)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: Text(price,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: c.textPrimary)),
+            ),
+            const SizedBox(width: 6),
+            _ChangeBadge(value: changePct, color: color),
           ]),
         ]),
       ),
@@ -196,39 +338,115 @@ class _StockTile extends StatelessWidget {
   }
 }
 
-class _CryptoTile extends StatelessWidget {
-  final CryptoMarket coin;
-  const _CryptoTile({required this.coin});
+class _FavCard extends StatelessWidget {
+  final WatchlistItem item;
+  const _FavCard({required this.item});
   @override
   Widget build(BuildContext context) {
-    final up = coin.priceChangePercentage24h >= 0;
-    final color = up ? AppColors.emerald : AppColors.red;
-    String fmtPrice(double p) => fmtCryptoPrice(p).replaceFirst('\$', '');
+    final c = context.colors;
+    final isCrypto = item.assetType == 'crypto';
+    final logo = (isCrypto && (item.image?.isNotEmpty ?? false))
+        ? _CoinLogo(image: item.image!, symbol: item.symbol)
+        : _Logo(symbol: item.symbol, size: 34, radius: 9);
     return InkWell(
-      onTap: () => context.push('/crypto/${coin.id}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      onTap: () => isCrypto
+          ? context.push(
+              '/crypto/${item.coingeckoId ?? item.symbol.toLowerCase()}')
+          : context.push('/stocks/${item.symbol}'),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.surfaceAlt),
+        ),
         child: Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(coin.image, width: 40, height: 40,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 40, height: 40, color: context.colors.surfaceAlt,
-                child: Center(child: Text(coin.symbol.toUpperCase().substring(0, 1),
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: context.colors.textMuted))),
-              )),
+          logo,
+          const SizedBox(width: 10),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.symbol.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: c.textPrimary)),
+              Text(item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: c.textMuted)),
+            ]),
           ),
-          SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(coin.symbol.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
-            Text(coin.name, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${fmtPrice(coin.currentPrice)}', style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.textPrimary)),
-            SizedBox(height: 2),
-            _ChangeBadge(value: coin.priceChangePercentage24h, color: color),
-          ]),
+          const Icon(Icons.star_rounded, size: 16, color: AppColors.emerald),
         ]),
+      ),
+    );
+  }
+}
+
+class _SearchPostCard extends StatelessWidget {
+  final BlogPost post;
+  const _SearchPostCard({required this.post});
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => context.push('/blog/${post.slug}', extra: post),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.surfaceAlt),
+          ),
+          child: Row(children: [
+            if (post.imageUrl?.isNotEmpty ?? false)
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(14)),
+                child: Image.network(post.imageUrl!,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(width: 72, height: 72, color: c.surfaceAlt)),
+              ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(post.category.toUpperCase(),
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.emerald,
+                              letterSpacing: 0.5)),
+                      const SizedBox(height: 4),
+                      Text(post.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: c.textPrimary,
+                              height: 1.25)),
+                    ]),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child:
+                  Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+            ),
+          ]),
+        ),
       ),
     );
   }
@@ -323,7 +541,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
                   mainAxisSpacing: 10,
                 ),
                 itemCount: stocks.length,
-                itemBuilder: (_, i) => _HeatmapCard(stock: stocks[i], rank: i + 1),
+                itemBuilder: (_, i) => _HeatmapCard(stock: stocks[i]),
               ),
             ),
           ),
@@ -562,8 +780,7 @@ class _ChangeBadge extends StatelessWidget {
 
 class _HeatmapCard extends StatelessWidget {
   final StockQuote stock;
-  final int rank;
-  const _HeatmapCard({required this.stock, required this.rank});
+  const _HeatmapCard({required this.stock});
 
   @override
   Widget build(BuildContext context) {
@@ -580,17 +797,7 @@ class _HeatmapCard extends StatelessWidget {
           border: Border.all(color: context.colors.surfaceAlt),
         ),
         child: Row(children: [
-          Stack(children: [
-            _Logo(symbol: stock.symbol, size: 36, radius: 9),
-            Positioned(
-              bottom: 0, right: 0,
-              child: Container(
-                width: 14, height: 14,
-                decoration: BoxDecoration(color: context.colors.background, borderRadius: BorderRadius.circular(4)),
-                child: Center(child: Text('$rank', style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold, color: context.colors.textMuted))),
-              ),
-            ),
-          ]),
+          _Logo(symbol: stock.symbol, size: 36, radius: 9),
           SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(stock.symbol, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),

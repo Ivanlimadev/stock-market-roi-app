@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/notification_prefs_provider.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 class NotificationsPage extends ConsumerWidget {
   const NotificationsPage({super.key});
@@ -13,6 +14,7 @@ class NotificationsPage extends ConsumerWidget {
     final async = ref.watch(notificationPrefsProvider);
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('Notifications')),
       body: SafeArea(
         child: user == null

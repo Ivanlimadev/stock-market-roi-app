@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
+import '../../core/widgets/app_bottom_nav.dart';
+import '../../core/shell/main_shell.dart';
 
 // ── Color scale ───────────────────────────────────────────────────────────────
 
@@ -41,14 +43,10 @@ class _HeatmapPageState extends ConsumerState<HeatmapPage> {
     final async = ref.watch(screenerProvider);
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(
         title: const Text('Market Heatmap'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(screenerProvider),
-          ),
-        ],
+        actions: MainShellMenu.actions(),
       ),
       body: SafeArea(
         child: async.when(

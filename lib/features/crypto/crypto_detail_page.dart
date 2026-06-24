@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/shell/main_shell.dart';
 import '../../core/api/api_client.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers/blog_provider.dart';
@@ -175,6 +176,7 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
           widget.coinId[0].toUpperCase() + widget.coinId.substring(1),
         ),
         actions: [
+          ...MainShellMenu.actions(),
           // Favorite — always visible; prompts auth if not logged in
           IconButton(
             icon: Icon(
@@ -225,7 +227,6 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
               );
             },
           ),
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
           IconButton(
             icon: const Icon(Icons.open_in_new),
             onPressed: () => launchUrl(

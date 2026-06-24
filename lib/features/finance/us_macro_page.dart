@@ -28,12 +28,9 @@ class UsMacroPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('US Economy'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => _refreshAll(ref),
-          ),
           MainShellMenu.themeButton(),
           MainShellMenu.settingsButton(),
+          MainShellMenu.avatarButton(),
         ],
       ),
       body: async.when(

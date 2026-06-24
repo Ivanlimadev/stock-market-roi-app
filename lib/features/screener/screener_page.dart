@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/shell/main_shell.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Sort column enum ──────────────────────────────────────────────────────────
 
@@ -122,7 +124,11 @@ class _ScreenerPageState extends ConsumerState<ScreenerPage> {
     final async = ref.watch(screenerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stock Screener')),
+      bottomNavigationBar: const AppBottomNav(),
+      appBar: AppBar(
+        title: const Text('Stock Screener'),
+        actions: MainShellMenu.actions(),
+      ),
       body: SafeArea(
         child: Column(
           children: [

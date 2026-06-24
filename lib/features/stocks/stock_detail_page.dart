@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/shell/main_shell.dart';
 import '../../core/providers/stock_detail_provider.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/stock_detail_model.dart';
@@ -38,6 +39,7 @@ class StockDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(sym),
         actions: [
+          ...MainShellMenu.actions(),
           // Favorite — always visible; prompts auth if not logged in
           IconButton(
             icon: Icon(
@@ -300,6 +302,9 @@ class _BodyState extends ConsumerState<_Body> {
 
         // ── SEC Filings ───────────────────────────────────────────────────────
         _SecFilingsSection(sym: sym),
+
+        // ── Insider Transactions (SEC Form 4) ─────────────────────────────────
+        _InsiderSection(sym: sym),
 
         // ── Related Articles ──────────────────────────────────────────────────
         _RelatedArticles(sym: sym),
@@ -579,13 +584,22 @@ class _EarningsCard extends StatelessWidget {
 
 // ── Key Statistics ────────────────────────────────────────────────────────────
 
-class _KeyStats extends StatelessWidget {
+class _KeyStats extends StatefulWidget {
   final StockInfo info;
   final StockDetail stock;
   const _KeyStats({required this.info, required this.stock});
 
   @override
+  State<_KeyStats> createState() => _KeyStatsState();
+}
+
+class _KeyStatsState extends State<_KeyStats> {
+  bool _showAll = false;
+
+  @override
   Widget build(BuildContext context) {
+    final info = widget.info;
+    final stock = widget.stock;
     String fmtN(double? v, {int d = 2}) =>
         v == null || v == 0 ? '—' : v.toStringAsFixed(d);
     String fmtVol(double? v) {
@@ -598,68 +612,95 @@ class _KeyStats extends StatelessWidget {
     String fmtPct(double? v) =>
         v == null ? '—' : '${(v * 100).toStringAsFixed(2)}%';
 
+    // Build all sections, keeping only rows that have data.
+    final sections = <(String, List<(String, String)>)>[
+      ('Valuation', [
+        ('Market Cap',    fmtBigUsd(info.marketCap)),
+        ('P/E (TTM)',     info.pe != null && info.pe! > 0 ? fmtN(info.pe) : '—'),
+        ('Forward P/E',   info.forwardPE != null && info.forwardPE! > 0 ? fmtN(info.forwardPE) : '—'),
+        ('PEG Ratio',     info.pegRatio != null && info.pegRatio! > 0 ? fmtN(info.pegRatio) : '—'),
+        ('EPS',           info.eps != null ? '\$${fmtN(info.eps)}' : '—'),
+        ('P/B Ratio',     info.priceToBook != null && info.priceToBook! > 0 ? fmtN(info.priceToBook) : '—'),
+      ].where((r) => r.$2 != '—').toList()),
+      ('Trading', [
+        ('Prev. Close',   fmtStockPrice(stock.prevClose)),
+        ('52W High',      info.week52High != null ? fmtStockPrice(info.week52High!) : '—'),
+        ('52W Low',       info.week52Low  != null ? fmtStockPrice(info.week52Low!)  : '—'),
+        ('Avg Vol 3M',    fmtVol(info.avgVolume3m)),
+        ('Avg Vol 10D',   fmtVol(info.avgVolume10d)),
+        ('Beta',          fmtN(info.beta)),
+        ('Analyst Target',info.targetMeanPrice != null ? fmtStockPrice(info.targetMeanPrice!) : '—'),
+      ].where((r) => r.$2 != '—').toList()),
+      if ((info.dividendYield ?? 0) > 0)
+        ('Dividendos', [
+          ('Dividend Yield',  fmtPct(info.dividendYield)),
+          ('Dividendo Anual', info.dividendRate != null ? '\$${fmtN(info.dividendRate)}' : '—'),
+          ('Ex-Dividend',     info.exDividendDate ?? '—'),
+          ('Payout Ratio',    info.payoutRatio != null ? '${(info.payoutRatio! * 100).toStringAsFixed(1)}%' : '—'),
+        ].where((r) => r.$2 != '—').toList()),
+      if (info.profitMargin != null || info.roe != null)
+        ('Rentabilidade', [
+          ('Net Margin',      info.profitMargin   != null ? '${(info.profitMargin! * 100).toStringAsFixed(1)}%' : '—'),
+          ('Op. Margin',      info.operatingMargin != null ? '${(info.operatingMargin! * 100).toStringAsFixed(1)}%' : '—'),
+          ('ROE',             info.roe != null ? '${(info.roe! * 100).toStringAsFixed(1)}%' : '—'),
+          ('ROA',             info.roa != null ? '${(info.roa! * 100).toStringAsFixed(1)}%' : '—'),
+          ('Rev. Growth',     info.revenueGrowth  != null ? '${(info.revenueGrowth! * 100).toStringAsFixed(1)}%' : '—'),
+          ('EPS Growth',      info.earningsGrowth != null ? '${(info.earningsGrowth! * 100).toStringAsFixed(1)}%' : '—'),
+        ].where((r) => r.$2 != '—').toList()),
+      if (info.totalRevenue != null || info.freeCashflow != null)
+        ('Balance Sheet', [
+          ('Total Revenue',  fmtBigUsd(info.totalRevenue)),
+          ('Total Debt',     fmtBigUsd(info.totalDebt)),
+          ('Debt/Equity',    info.debtToEquity   != null ? fmtN(info.debtToEquity, d: 2) : '—'),
+          ('Current Ratio',  info.currentRatio    != null ? fmtN(info.currentRatio,  d: 2) : '—'),
+          ('Free Cash Flow', fmtBigUsd(info.freeCashflow)),
+        ].where((r) => r.$2 != '—' && r.$2 != '\$—').toList()),
+    ].where((s) => s.$2.isNotEmpty).toList();
+
+    final allRows = sections.expand((s) => s.$2).toList();
+    final total = allRows.length;
+
     return _Section(
       title: 'Statistics',
       child: Column(
         children: [
-          // Valuation
-          _SubHeader('Valuation'),
-          _RowList(rows: [
-            ('Market Cap',    fmtBigUsd(info.marketCap)),
-            ('P/E (TTM)',     info.pe != null && info.pe! > 0 ? fmtN(info.pe) : '—'),
-            ('Forward P/E',   info.forwardPE != null && info.forwardPE! > 0 ? fmtN(info.forwardPE) : '—'),
-            ('PEG Ratio',     info.pegRatio != null && info.pegRatio! > 0 ? fmtN(info.pegRatio) : '—'),
-            ('EPS',           info.eps != null ? '\$${fmtN(info.eps)}' : '—'),
-            ('P/B Ratio',     info.priceToBook != null && info.priceToBook! > 0 ? fmtN(info.priceToBook) : '—'),
-          ].where((r) => r.$2 != '—').toList()),
+          if (_showAll)
+            for (final s in sections) ...[
+              _SubHeader(s.$1),
+              _RowList(rows: s.$2),
+            ]
+          else
+            _RowList(rows: allRows.take(5).toList()),
 
-          // Trading
-          _SubHeader('Trading'),
-          _RowList(rows: [
-            ('Prev. Close',   fmtStockPrice(stock.prevClose)),
-            ('52W High',      info.week52High != null ? fmtStockPrice(info.week52High!) : '—'),
-            ('52W Low',       info.week52Low  != null ? fmtStockPrice(info.week52Low!)  : '—'),
-            ('Avg Vol 3M',    fmtVol(info.avgVolume3m)),
-            ('Avg Vol 10D',   fmtVol(info.avgVolume10d)),
-            ('Beta',          fmtN(info.beta)),
-            ('Analyst Target',info.targetMeanPrice != null ? fmtStockPrice(info.targetMeanPrice!) : '—'),
-          ].where((r) => r.$2 != '—').toList()),
-
-          // Dividends
-          if ((info.dividendYield ?? 0) > 0) ...[
-            _SubHeader('Dividendos'),
-            _RowList(rows: [
-              ('Dividend Yield',  fmtPct(info.dividendYield)),
-              ('Dividendo Anual', info.dividendRate != null ? '\$${fmtN(info.dividendRate)}' : '—'),
-              ('Ex-Dividend',     info.exDividendDate ?? '—'),
-              ('Payout Ratio',    info.payoutRatio != null ? '${(info.payoutRatio! * 100).toStringAsFixed(1)}%' : '—'),
-            ].where((r) => r.$2 != '—').toList()),
-          ],
-
-          // Profitability
-          if (info.profitMargin != null || info.roe != null) ...[
-            _SubHeader('Rentabilidade'),
-            _RowList(rows: [
-              ('Net Margin',      info.profitMargin   != null ? '${(info.profitMargin! * 100).toStringAsFixed(1)}%' : '—'),
-              ('Op. Margin',      info.operatingMargin != null ? '${(info.operatingMargin! * 100).toStringAsFixed(1)}%' : '—'),
-              ('ROE',             info.roe != null ? '${(info.roe! * 100).toStringAsFixed(1)}%' : '—'),
-              ('ROA',             info.roa != null ? '${(info.roa! * 100).toStringAsFixed(1)}%' : '—'),
-              ('Rev. Growth',     info.revenueGrowth  != null ? '${(info.revenueGrowth! * 100).toStringAsFixed(1)}%' : '—'),
-              ('EPS Growth',      info.earningsGrowth != null ? '${(info.earningsGrowth! * 100).toStringAsFixed(1)}%' : '—'),
-            ].where((r) => r.$2 != '—').toList()),
-          ],
-
-          // Balance Sheet
-          if (info.totalRevenue != null || info.freeCashflow != null) ...[
-            _SubHeader('Balance Sheet'),
-            _RowList(rows: [
-              ('Total Revenue',  fmtBigUsd(info.totalRevenue)),
-              ('Total Debt',     fmtBigUsd(info.totalDebt)),
-              ('Debt/Equity',    info.debtToEquity   != null ? fmtN(info.debtToEquity, d: 2) : '—'),
-              ('Current Ratio',  info.currentRatio    != null ? fmtN(info.currentRatio,  d: 2) : '—'),
-              ('Free Cash Flow', fmtBigUsd(info.freeCashflow)),
-            ].where((r) => r.$2 != '—' && r.$2 != '\$—').toList()),
-          ],
+          if (total > 5)
+            InkWell(
+              onTap: () => setState(() => _showAll = !_showAll),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                  border: Border(
+                      top: BorderSide(color: context.colors.surfaceAlt, width: 0.5)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_showAll ? 'Show less' : 'See all $total statistics',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.emerald)),
+                    const SizedBox(width: 4),
+                    Icon(
+                        _showAll
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: context.colors.emerald),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1943,12 +1984,48 @@ class _FinancialSectionState extends ConsumerState<_FinancialSection> {
                 child: _FinBarChart(periods: filtered),
               ),
               SizedBox(height: 12),
+
+              // ── Margins (latest period) ─────────────────────────────────
+              Builder(builder: (_) {
+                final withRev = filtered.where((p) => p.revenue != null && p.revenue != 0).toList();
+                if (withRev.isEmpty) return const SizedBox.shrink();
+                final m = withRev.reduce((a, b) => a.date.compareTo(b.date) >= 0 ? a : b);
+                final rev = m.revenue!;
+                if (m.grossProfit == null && m.operatingIncome == null && m.netIncome == null) {
+                  return const SizedBox.shrink();
+                }
+                String pct(double? v) => v == null ? '—' : '${(v / rev * 100).toStringAsFixed(1)}%';
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Row(children: [
+                    Expanded(child: _MiniMargin('Gross Margin', pct(m.grossProfit), AppColors.emerald)),
+                    Expanded(child: _MiniMargin('Op. Margin', pct(m.operatingIncome), const Color(0xFF8B5CF6))),
+                    Expanded(child: _MiniMargin('Net Margin', pct(m.netIncome), const Color(0xFF6366F1))),
+                  ]),
+                );
+              }),
             ],
           ),
         );
       },
     );
   }
+}
+
+class _MiniMargin extends StatelessWidget {
+  final String label, value;
+  final Color color;
+  const _MiniMargin(this.label, this.value, this.color);
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: TextStyle(fontSize: 10, color: context.colors.textMuted)),
+      const SizedBox(height: 2),
+      Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
+    ],
+  );
 }
 
 class _FinBarChart extends StatelessWidget {
@@ -2347,6 +2424,154 @@ class _SecFilingsSection extends ConsumerWidget {
                 ),
               );
             }).toList(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Insider Transactions (SEC Form 4) ───────────────────────────────────────────
+
+class _InsiderSection extends ConsumerWidget {
+  final String sym;
+  const _InsiderSection({required this.sym});
+
+  String _usd(double n) {
+    final abs = n.abs();
+    final sign = n < 0 ? '-' : '';
+    if (abs >= 1e9) return '$sign\$${(abs / 1e9).toStringAsFixed(1)}B';
+    if (abs >= 1e6) return '$sign\$${(abs / 1e6).toStringAsFixed(1)}M';
+    if (abs >= 1e3) return '$sign\$${(abs / 1e3).toStringAsFixed(0)}K';
+    return '$sign\$${abs.toStringAsFixed(0)}';
+  }
+
+  String _sh(double? n) {
+    if (n == null) return '—';
+    if (n >= 1e6) return '${(n / 1e6).toStringAsFixed(2)}M';
+    if (n >= 1e3) return '${(n / 1e3).toStringAsFixed(1)}K';
+    return n.toStringAsFixed(0);
+  }
+
+  String _date(String iso) {
+    final d = DateTime.tryParse(iso);
+    if (d == null) return iso;
+    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${m[d.month - 1]} ${d.day}, ${d.year % 100}';
+  }
+
+  (String, Color) _typeChip(String t, BuildContext ctx) {
+    switch (t) {
+      case 'buy':  return ('Buy', AppColors.emerald);
+      case 'sell': return ('Sell', AppColors.red);
+      case 'award':  return ('Grant', ctx.colors.textMuted);
+      case 'option': return ('Option', ctx.colors.textMuted);
+      case 'tax':    return ('Tax', ctx.colors.textMuted);
+      case 'gift':   return ('Gift', ctx.colors.textMuted);
+      default:       return ('Other', ctx.colors.textMuted);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(stockInsidersProvider(sym));
+    return async.when(
+      loading: () => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (d) {
+        if (d.transactions.isEmpty) return const SizedBox.shrink();
+        final c = context.colors;
+        final hasSignal = d.buys > 0 || d.sells > 0;
+        final netBuying = d.netValue > 0;
+        final txs = d.transactions.take(12).toList();
+        return _Section(
+          title: 'Insider Transactions',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasSignal)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: c.surfaceAlt.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (netBuying ? AppColors.emerald : AppColors.red).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(netBuying ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                              size: 14, color: netBuying ? AppColors.emerald : AppColors.red),
+                          const SizedBox(width: 4),
+                          Text(netBuying ? 'Net buying' : 'Net selling',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                                  color: netBuying ? AppColors.emerald : AppColors.red)),
+                        ]),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${d.months}mo', style: TextStyle(fontSize: 11, color: c.textMuted)),
+                      const Spacer(),
+                      Text('${d.buys} buys', style: TextStyle(fontSize: 11, color: AppColors.emerald, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 10),
+                      Text('${d.sells} sells', style: TextStyle(fontSize: 11, color: AppColors.red, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ...txs.asMap().entries.map((e) {
+                final isLast = e.key == txs.length - 1;
+                final t = e.value;
+                final (label, color) = _typeChip(t.type, context);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: isLast ? null : Border(bottom: BorderSide(color: c.surfaceAlt, width: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.owner, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                            Text('${_date(t.date)} · ${t.role}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 11, color: c.textMuted)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+                        child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 66,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(_sh(t.shares), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                            Text(t.value != null ? _usd(t.value!) : '—', style: TextStyle(fontSize: 11, color: c.textMuted)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Text('SEC Form 4 · officers, directors & 10% owners',
+                    style: TextStyle(fontSize: 10, color: c.textMuted)),
+              ),
+            ],
           ),
         );
       },

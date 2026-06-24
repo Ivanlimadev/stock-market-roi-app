@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/services/local_avatar_service.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 class PerfilPage extends StatelessWidget {
   const PerfilPage({super.key});
@@ -22,6 +26,7 @@ class _GuestPerfil extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('My Account')),
       body: SafeArea(
         child: Padding(
@@ -95,16 +100,17 @@ class _GuestPerfil extends StatelessWidget {
 
 // ─── Logged-in ────────────────────────────────────────────────────────────────
 
-class _LoggedPerfil extends StatefulWidget {
+class _LoggedPerfil extends ConsumerStatefulWidget {
   final User user;
   const _LoggedPerfil({required this.user});
 
   @override
-  State<_LoggedPerfil> createState() => _LoggedPerfilState();
+  ConsumerState<_LoggedPerfil> createState() => _LoggedPerfilState();
 }
 
-class _LoggedPerfilState extends State<_LoggedPerfil> {
-  bool _loading = false;
+class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
+  bool _loading = false; // sign out / delete account
+  bool _busy = false;    // avatar upload / remove
 
   static final _dateFmt = DateFormat('MMM d, yyyy');
 
@@ -125,6 +131,187 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
       context.go('/home');
     }
   }
+
+  // ── Photo ────────────────────────────────────────────────────────────────
+
+  Future<void> _changePhoto() async {
+    setState(() => _busy = true);
+    try {
+      final ok = await LocalAvatarService.pickAndSave();
+      if (ok) ref.invalidate(localAvatarProvider);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not set photo.')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() => _busy = true);
+    try {
+      await LocalAvatarService.remove();
+      ref.invalidate(localAvatarProvider);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showPhotoActions({required bool hasPhoto}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_rounded),
+            title: const Text('Change photo'),
+            onTap: () { Navigator.pop(ctx); _changePhoto(); },
+          ),
+          if (hasPhoto)
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: AppColors.red),
+              title: const Text('Remove photo',
+                  style: TextStyle(color: AppColors.red)),
+              onTap: () { Navigator.pop(ctx); _removePhoto(); },
+            ),
+        ]),
+      ),
+    );
+  }
+
+  // ── Display name ─────────────────────────────────────────────────────────
+
+  Future<void> _editName(String? current) async {
+    final ctrl = TextEditingController(text: current ?? '');
+    final c = context.colors;
+    final name = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Username', style: TextStyle(fontSize: 16)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          style: TextStyle(color: c.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Your name',
+            hintStyle: TextStyle(color: c.textMuted),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: c.border)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.emerald)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: c.textMuted))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.emerald,
+                foregroundColor: Colors.white),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name == null) return;
+    await ProfileService.updateDisplayName(name);
+    ref.invalidate(profileProvider);
+  }
+
+  // ── Password ─────────────────────────────────────────────────────────────
+
+  Future<void> _changePassword() async {
+    final c = context.colors;
+    final pwd = TextEditingController();
+    final confirm = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final valid = pwd.text.length >= 6 && pwd.text == confirm.text;
+          InputDecoration dec(String hint) => InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: c.textMuted),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: c.border)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.emerald)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              );
+          return AlertDialog(
+            backgroundColor: c.background,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Change password', style: TextStyle(fontSize: 16)),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                controller: pwd,
+                obscureText: true,
+                onChanged: (_) => setS(() {}),
+                style: TextStyle(color: c.textPrimary),
+                decoration: dec('New password (min. 6)'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: confirm,
+                obscureText: true,
+                onChanged: (_) => setS(() {}),
+                style: TextStyle(color: c.textPrimary),
+                decoration: dec('Confirm new password'),
+              ),
+            ]),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: TextStyle(color: c.textMuted))),
+              FilledButton(
+                onPressed: valid ? () => Navigator.pop(ctx, true) : null,
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.emerald,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor:
+                        AppColors.emerald.withValues(alpha: 0.3)),
+                child: const Text('Update'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+    try {
+      await Supabase.instance.client.auth
+          .updateUser(UserAttributes(password: pwd.text));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password updated.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not update password.')));
+      }
+    }
+  }
+
+  // ── Delete ───────────────────────────────────────────────────────────────
 
   Future<void> _showDeleteConfirm() async {
     final ctrl = TextEditingController();
@@ -204,6 +391,8 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
 
     setState(() => _loading = true);
     try {
+      // Local-only avatar — drop it from the device before wiping the account.
+      await LocalAvatarService.remove();
       await Supabase.instance.client.rpc('delete_user');
       await Supabase.instance.client.auth.signOut();
       if (mounted) context.go('/home');
@@ -222,11 +411,20 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
     final c       = context.colors;
     final user    = widget.user;
     final email   = user.email ?? '';
-    final initials = email.isNotEmpty ? email[0].toUpperCase() : 'U';
     final verified = user.emailConfirmedAt != null;
     final memberSince = _formatDate(user.createdAt);
 
+    final profile    = ref.watch(profileProvider).valueOrNull;
+    final avatarFile = ref.watch(localAvatarProvider).valueOrNull;
+    final displayName = (profile?.displayName?.isNotEmpty ?? false)
+        ? profile!.displayName!
+        : null;
+    final initials = (displayName?.isNotEmpty ?? false)
+        ? displayName![0].toUpperCase()
+        : (email.isNotEmpty ? email[0].toUpperCase() : 'U');
+
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('My Account')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -236,50 +434,93 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
             children: [
               const SizedBox(height: 32),
 
-              // Avatar
+              // Avatar — tap to change/remove photo
               Center(
-                child: Stack(
-                  children: [
-                    Container(
-                      width: 80, height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.emerald.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(40),
+                child: GestureDetector(
+                  onTap: () => _showPhotoActions(hasPhoto: avatarFile != null),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 80, height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.emerald.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(40),
+                          image: avatarFile != null
+                              ? DecorationImage(
+                                  image: FileImage(avatarFile),
+                                  fit: BoxFit.cover)
+                              : null,
+                        ),
+                        child: avatarFile == null
+                            ? Center(
+                                child: Text(initials,
+                                    style: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.emerald)),
+                              )
+                            : null,
                       ),
-                      child: Center(
-                        child: Text(initials,
-                            style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.emerald)),
-                      ),
-                    ),
-                    if (verified)
+                      if (_busy)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(40)),
+                            child: const Center(
+                                child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))),
+                          ),
+                        ),
+                      // Camera badge → photo actions
                       Positioned(
                         right: 0, bottom: 0,
                         child: Container(
-                          width: 22, height: 22,
+                          width: 26, height: 26,
                           decoration: BoxDecoration(
                             color: AppColors.emerald,
-                            borderRadius: BorderRadius.circular(11),
+                            borderRadius: BorderRadius.circular(13),
                             border: Border.all(color: c.background, width: 2),
                           ),
-                          child: Icon(Icons.check_rounded,
-                              size: 13, color: Colors.white),
+                          child: const Icon(Icons.photo_camera_rounded,
+                              size: 14, color: Colors.white),
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
               Center(
-                child: Text(email,
-                    style: TextStyle(fontSize: 14, color: c.textSecond)),
+                child: Text(displayName ?? email,
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: c.textPrimary)),
               ),
+              if (displayName != null) ...[
+                const SizedBox(height: 2),
+                Center(
+                  child: Text(email,
+                      style: TextStyle(fontSize: 13, color: c.textMuted)),
+                ),
+              ],
               const SizedBox(height: 32),
 
               // Info cards
               _InfoCard(children: [
+                _InfoRow(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Username',
+                  value: displayName ?? 'Add a username',
+                  onTap: () => _editName(profile?.displayName),
+                  trailing: Icon(Icons.edit_rounded,
+                      size: 16, color: c.textMuted),
+                ),
+                Divider(height: 1, color: c.surfaceAlt),
                 _InfoRow(
                   icon: Icons.email_outlined,
                   label: 'Email',
@@ -308,11 +549,19 @@ class _LoggedPerfilState extends State<_LoggedPerfil> {
                   label: 'Member since',
                   value: memberSince,
                 ),
-                Divider(height: 1, color: c.surfaceAlt),
+              ]),
+
+              const SizedBox(height: 16),
+
+              // Security
+              _InfoCard(children: [
                 _InfoRow(
-                  icon: Icons.shield_outlined,
-                  label: 'Account ID',
-                  value: user.id.substring(0, 8).toUpperCase() + '…',
+                  icon: Icons.lock_outline_rounded,
+                  label: 'Password',
+                  value: 'Change your password',
+                  onTap: _changePassword,
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      size: 18, color: c.textMuted),
                 ),
               ]),
 
@@ -381,17 +630,19 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label, value;
   final Widget? trailing;
+  final VoidCallback? onTap;
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
     this.trailing,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
@@ -412,9 +663,11 @@ class _InfoRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 }

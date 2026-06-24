@@ -24,7 +24,11 @@ class _LoginPageState extends State<LoginPage> {
         email: _email.text.trim(),
         password: _password.text,
       );
-      if (mounted) context.go('/home');
+      // First sign-in → invite the user to add a profile photo (once).
+      final seen = Supabase.instance.client.auth.currentUser
+              ?.userMetadata?['photo_onboarded'] ==
+          true;
+      if (mounted) context.go(seen ? '/home' : '/onboarding/photo');
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -51,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(height: 48),
 
               // Logo
-              Icon(Icons.bar_chart_rounded, size: 48, color: AppColors.emerald),
+              Icon(Icons.trending_up_rounded, size: 48, color: AppColors.emerald),
               SizedBox(height: 16),
               Text(
                 'Stock Market ROI',

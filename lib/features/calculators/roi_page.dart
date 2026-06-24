@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import 'calc_widgets.dart';
+import '../../core/widgets/app_bottom_nav.dart';
 
 const _orange = Color(0xFFF97316);
 
@@ -108,6 +109,7 @@ class _ROIPageState extends State<ROIPage> {
     final roiColor = isPos ? AppColors.emerald : AppColors.red;
 
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(),
       appBar: AppBar(title: const Text('ROI Calculator')),
       body: SafeArea(
         child: SingleChildScrollView(
