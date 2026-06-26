@@ -12,6 +12,7 @@ import '../../core/providers/blog_provider.dart';
 import '../../core/providers/stock_detail_provider.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../core/widgets/app_footer.dart';
+import '../../core/widgets/author_byline.dart';
 import '../../core/ads/native_ad_tile.dart';
 
 // Busca o post completo pelo slug quando content não vem na navegação
@@ -200,6 +201,9 @@ class _PostBody extends ConsumerWidget {
 
           // ── Mais artigos ─────────────────────────────────────────────────
           _MoreArticles(currentSlug: post.slug, category: post.category),
+
+          // ── Author byline (tap to expand) ────────────────────────────────
+          const AuthorByline(),
 
           const SizedBox(height: 32),
 
