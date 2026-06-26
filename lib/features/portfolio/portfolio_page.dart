@@ -817,8 +817,6 @@ class _DividendosTab extends ConsumerWidget {
         if (list.isEmpty) return const _EmptyState();
 
         final totalAnual = payers.fold(0.0, (s, d) => s + d.annualTotal);
-        final totalInvested = payers.fold(
-            0.0, (s, d) => s + d.netShares * 0); // placeholder
         final avgYield = payers.isEmpty
             ? 0.0
             : payers.fold(0.0, (s, d) => s + d.yieldPct) / payers.length;

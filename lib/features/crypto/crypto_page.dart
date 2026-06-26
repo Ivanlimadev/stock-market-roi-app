@@ -543,7 +543,6 @@ class _RankingSection extends ConsumerWidget {
       List<({String id, String name, String symbol, String image, double price, double change, int rank})> coins) {
     return Column(
       children: coins.map((c) {
-        final up = c.change >= 0;
         return InkWell(
           onTap: () => context.push('/crypto/${c.id}'),
           borderRadius: BorderRadius.circular(10),
