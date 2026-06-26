@@ -14,6 +14,14 @@ import 'package:flutter/foundation.dart';
 class AdConfig {
   AdConfig._();
 
+  // ── Format toggles ────────────────────────────────────────────────────────
+  // Pre-launch we run a light, "few high-value ads" experience (rewarded +
+  // interstitial + native) to protect retention. App Open and Banner are the
+  // most intrusive / lowest value per annoyance, so they're OFF for now.
+  // Flip to `true` to re-enable once traffic volume justifies the UX cost.
+  static const bool enableAppOpen = false;
+  static const bool enableBanner = false;
+
   // ── Real production IDs ───────────────────────────────────────────────────
   // iOS — created in the AdMob console (app ca-app-pub-7113858977365190~6934968222)
   static const _iosInterstitialReal = 'ca-app-pub-7113858977365190/6788618243';

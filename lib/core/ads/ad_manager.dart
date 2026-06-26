@@ -67,7 +67,7 @@ class AdManager {
 
     if (await ConsentInformation.instance.canRequestAds()) {
       _loadInterstitial();
-      AppOpenAdManager.instance.start();
+      if (AdConfig.enableAppOpen) AppOpenAdManager.instance.start();
     }
   }
 

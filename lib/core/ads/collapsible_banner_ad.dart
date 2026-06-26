@@ -22,6 +22,7 @@ class _CollapsibleBannerAdState extends State<CollapsibleBannerAd> {
   @override
   void initState() {
     super.initState();
+    if (!AdConfig.enableBanner) return; // disabled pre-launch
     // Needs the screen width for the adaptive size — defer to the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
