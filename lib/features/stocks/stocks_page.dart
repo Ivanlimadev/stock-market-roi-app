@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
+import '../portfolio/add_transaction_sheet.dart';
 
 final _searchProvider = StateProvider<String>((ref) => '');
 
@@ -98,7 +99,19 @@ class _StockListTile extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 14),
+            SizedBox(width: 8),
+            // Quick add-to-portfolio (opens the transaction sheet pre-filled).
+            IconButton(
+              onPressed: () =>
+                  showAddTransactionSheet(context, initialSymbol: stock.symbol),
+              icon: Icon(Icons.add_circle_outline_rounded, color: AppColors.emerald),
+              iconSize: 22,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(4),
+              tooltip: 'Add to portfolio',
+            ),
+            SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

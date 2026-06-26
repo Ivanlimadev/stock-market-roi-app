@@ -6,6 +6,7 @@ import '../../core/shell/main_shell.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/ads/ad_manager.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
 // ── Sort column enum ──────────────────────────────────────────────────────────
@@ -58,6 +59,27 @@ class _ScreenerPageState extends ConsumerState<ScreenerPage> {
   String _sector    = 'All';
   _SortCol _sortCol = _SortCol.marketCap;
   bool _sortAsc     = false;
+
+  // Rewarded gate: show the first [_freeRows] matches free, the rest after an ad.
+  static const int _freeRows = 12;
+  bool _resultsUnlocked = false;
+  bool _loadingAd       = false;
+
+  void _unlockResults() {
+    setState(() => _loadingAd = true);
+    AdManager.instance.showRewarded(
+      onReward: () {
+        if (mounted) setState(() => _resultsUnlocked = true);
+      },
+      onUnavailable: () {
+        if (!mounted) return;
+        setState(() {
+          _loadingAd = false;
+          _resultsUnlocked = true; // don't block the user if no ad is available
+        });
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -260,20 +282,32 @@ class _ScreenerPageState extends ConsumerState<ScreenerPage> {
                           style: TextStyle(color: c.textMuted)),
                     );
                   }
+                  final gated = !_resultsUnlocked && rows.length > _freeRows;
+                  final visible = gated ? _freeRows : rows.length;
                   return RefreshIndicator(
                     color: AppColors.emerald,
                     onRefresh: () async =>
                         ref.invalidate(screenerProvider),
                     child: ListView.separated(
-                      itemCount: rows.length,
+                      // +1 slot for the unlock card when results are gated.
+                      itemCount: visible + (gated ? 1 : 0),
                       separatorBuilder: (_, __) =>
                           Divider(height: 1, color: c.surfaceAlt),
-                      itemBuilder: (ctx, i) => _ScreenerRow(
-                        quote: rows[i],
-                        sortCol: _sortCol,
-                        onTap: () =>
-                            context.push('/stocks/${rows[i].symbol}'),
-                      ),
+                      itemBuilder: (ctx, i) {
+                        if (gated && i == visible) {
+                          return _UnlockResultsCard(
+                            hidden: rows.length - _freeRows,
+                            loading: _loadingAd,
+                            onUnlock: _unlockResults,
+                          );
+                        }
+                        return _ScreenerRow(
+                          quote: rows[i],
+                          sortCol: _sortCol,
+                          onTap: () =>
+                              context.push('/stocks/${rows[i].symbol}'),
+                        );
+                      },
                     ),
                   );
                 },
@@ -281,6 +315,52 @@ class _ScreenerPageState extends ConsumerState<ScreenerPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Rewarded unlock card ──────────────────────────────────────────────────────
+
+class _UnlockResultsCard extends StatelessWidget {
+  final int hidden;
+  final bool loading;
+  final VoidCallback onUnlock;
+  const _UnlockResultsCard({
+    required this.hidden,
+    required this.loading,
+    required this.onUnlock,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+      child: Column(
+        children: [
+          Icon(Icons.lock_outline_rounded, size: 26, color: c.textMuted),
+          const SizedBox(height: 10),
+          Text('+$hidden more matches',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                  color: c.textPrimary)),
+          const SizedBox(height: 4),
+          Text('Watch a short ad to unlock the full screener results.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: c.textSecond)),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: loading ? null : onUnlock,
+              icon: loading
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.play_circle_outline_rounded, size: 18),
+              label: Text(loading ? 'Loading…' : 'Watch ad to unlock all results'),
+            ),
+          ),
+        ],
       ),
     );
   }

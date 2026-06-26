@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/ads/native_ad_tile.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/models/blog_post_model.dart';
@@ -127,16 +128,29 @@ class _NewsPageState extends ConsumerState<NewsPage>
                     .then((_) {})
                     .catchError((_) {});
               },
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    color: context.colors.surfaceAlt,
-                    indent: 16,
-                    endIndent: 16),
-                itemBuilder: (_, i) => _PostTile(post: filtered[i]),
-              ),
+              child: Builder(builder: (context) {
+                // Insert a native ad after every `adEvery` posts (never trailing).
+                const adEvery = 6;
+                final adCount =
+                    filtered.isEmpty ? 0 : (filtered.length - 1) ~/ adEvery;
+                final total = filtered.length + adCount;
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: total,
+                  separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: context.colors.surfaceAlt,
+                      indent: 16,
+                      endIndent: 16),
+                  itemBuilder: (_, i) {
+                    if ((i + 1) % (adEvery + 1) == 0) {
+                      return const NativeAdTile();
+                    }
+                    final postIndex = i - (i ~/ (adEvery + 1));
+                    return _PostTile(post: filtered[postIndex]);
+                  },
+                );
+              }),
             );
           }).toList(),
         ),

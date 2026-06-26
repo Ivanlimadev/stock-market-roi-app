@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/theme_provider.dart';
 import '../providers/profile_provider.dart';
+import '../services/notification_inbox.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
 
@@ -46,6 +47,35 @@ class MainShellMenu {
             tooltip: isDark ? 'Tema claro' : 'Tema escuro',
             onPressed: () => ref.read(themeProvider.notifier).state =
                 isDark ? ThemeMode.light : ThemeMode.dark,
+          );
+        },
+      );
+
+  /// Received-notifications inbox. Shows a green dot badge and turns green when
+  /// there are unread notifications.
+  static Widget inboxButton() =>
+      ValueListenableBuilder<List<InboxNotification>>(
+        valueListenable: NotificationInbox.items,
+        builder: (context, items, _) {
+          final unread = items.where((n) => !n.read).length;
+          final hasUnread = unread > 0;
+          return IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => context.push('/notifications'),
+            icon: Badge(
+              isLabelVisible: hasUnread,
+              backgroundColor: AppColors.emerald,
+              label: unread > 9
+                  ? const Text('9+')
+                  : (unread > 1 ? Text('$unread') : null),
+              smallSize: 8,
+              child: Icon(
+                hasUnread
+                    ? Icons.mark_email_unread_rounded
+                    : Icons.mail_outline_rounded,
+                color: hasUnread ? AppColors.emerald : null,
+              ),
+            ),
           );
         },
       );

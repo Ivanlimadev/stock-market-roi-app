@@ -77,7 +77,7 @@ class AppFooter extends StatelessWidget {
           ),
           SizedBox(height: 6),
           Text(
-            'Data provided by Yahoo Finance. For informational purposes only.',
+            'Market data is provided for informational purposes only and may be delayed.',
             style: TextStyle(fontSize: 10, color: c.textMuted),
           ),
 

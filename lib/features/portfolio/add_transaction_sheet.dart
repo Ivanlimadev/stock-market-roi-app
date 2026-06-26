@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/api/api_client.dart';
 import '../../core/providers/portfolio_provider.dart';
+import '../../core/providers/realtime_price_provider.dart';
 
-Future<void> showAddTransactionSheet(BuildContext context) {
+Future<void> showAddTransactionSheet(BuildContext context, {String? initialSymbol}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -14,14 +18,15 @@ Future<void> showAddTransactionSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => const _AddTransactionSheet(),
+    builder: (_) => _AddTransactionSheet(initialSymbol: initialSymbol),
   );
 }
 
 // ── Sheet widget ──────────────────────────────────────────────────────────────
 
 class _AddTransactionSheet extends ConsumerStatefulWidget {
-  const _AddTransactionSheet();
+  final String? initialSymbol;
+  const _AddTransactionSheet({this.initialSymbol});
 
   @override
   ConsumerState<_AddTransactionSheet> createState() =>
@@ -30,7 +35,8 @@ class _AddTransactionSheet extends ConsumerStatefulWidget {
 
 class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _symbolCtrl = TextEditingController();
+  late final _symbolCtrl =
+      TextEditingController(text: widget.initialSymbol?.toUpperCase() ?? '');
   final _qtyCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _feesCtrl = TextEditingController();
@@ -40,13 +46,73 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
   DateTime _date = DateTime.now();
   bool _loading = false;
 
+  // Live-quote auto-fill for the price field.
+  bool _priceLoading = false;
+  String? _autoFilledPrice; // last value we auto-filled (to detect manual edits)
+  Timer? _priceDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    final sym = widget.initialSymbol?.trim();
+    if (sym != null && sym.isNotEmpty) _prefillPrice(sym.toUpperCase());
+  }
+
   @override
   void dispose() {
+    _priceDebounce?.cancel();
     _symbolCtrl.dispose();
     _qtyCtrl.dispose();
     _priceCtrl.dispose();
     _feesCtrl.dispose();
     super.dispose();
+  }
+
+  /// Whether the price field is empty or still holds the value we last
+  /// auto-filled — i.e. the user hasn't manually edited it, so it's safe to
+  /// overwrite with a fresh quote.
+  bool get _priceUntouched =>
+      _priceCtrl.text.isEmpty || _priceCtrl.text == _autoFilledPrice;
+
+  /// Fetches the current quote for [symbol] and fills the price field, unless
+  /// the user already typed their own price. Crypto uses the live WebSocket
+  /// feed; everything else uses the REST quote endpoint.
+  Future<void> _prefillPrice(String symbol) async {
+    if (symbol.isEmpty) return;
+    setState(() => _priceLoading = true);
+    double? price;
+    try {
+      if (_assetType == 'crypto') {
+        final id = kCryptoTickerToCoinId[symbol];
+        if (id != null) price = ref.read(realtimePriceProvider)[id];
+      }
+      if (price == null) {
+        final res = await ApiClient.dio.get('/stocks/$symbol');
+        final info = res.data as Map<String, dynamic>?;
+        price = (info?['currentPrice'] as num?)?.toDouble() ??
+            (info?['price'] as num?)?.toDouble();
+      }
+    } catch (_) {
+      // Quote unavailable — leave the field for manual entry.
+    }
+    if (!mounted) return;
+    setState(() {
+      _priceLoading = false;
+      if (price != null && price > 0 && _priceUntouched) {
+        final text = price.toStringAsFixed(2);
+        _priceCtrl.text = text;
+        _autoFilledPrice = text;
+      }
+    });
+  }
+
+  /// Debounced quote refresh while the user types a symbol.
+  void _onSymbolChanged(String value) {
+    _priceDebounce?.cancel();
+    final sym = value.trim().toUpperCase();
+    if (sym.isEmpty) return;
+    _priceDebounce = Timer(const Duration(milliseconds: 600),
+        () => _prefillPrice(sym));
   }
 
   double get _total {
@@ -81,7 +147,13 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     setState(() => _loading = true);
+
+    // Capture before the await so we never touch a disposed sheet context.
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final symbol = _symbolCtrl.text.trim().toUpperCase();
 
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -89,7 +161,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
 
       await Supabase.instance.client.from('portfolio_transactions').insert({
         'user_id': user.id,
-        'symbol': _symbolCtrl.text.trim().toUpperCase(),
+        'symbol': symbol,
         'asset_type': _assetType,
         'type': _operation,
         'quantity': double.parse(_qtyCtrl.text),
@@ -102,15 +174,20 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
       ref.invalidate(portfolioEnrichedProvider);
       ref.invalidate(portfolioTransactionsProvider);
 
-      if (mounted) Navigator.of(context).pop();
+      // Always close the sheet on success.
+      navigator.pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            '$symbol ${_operation == 'buy' ? 'comprado' : 'vendido'} — carteira atualizada'),
+        backgroundColor: AppColors.emerald,
+        duration: const Duration(seconds: 2),
+      ));
     } catch (e) {
-      setState(() => _loading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erro: $e'),
-          backgroundColor: AppColors.red,
-        ));
-      }
+      if (mounted) setState(() => _loading = false);
+      messenger.showSnackBar(SnackBar(
+        content: Text('Erro: $e'),
+        backgroundColor: AppColors.red,
+      ));
     }
   }
 
@@ -158,7 +235,11 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                     ('crypto', 'Crypto'),
                   ],
                   selected: _assetType,
-                  onSelect: (v) => setState(() => _assetType = v),
+                  onSelect: (v) {
+                    setState(() => _assetType = v);
+                    final sym = _symbolCtrl.text.trim().toUpperCase();
+                    if (sym.isNotEmpty) _prefillPrice(sym);
+                  },
                   color: AppColors.emerald,
                 ),
                 SizedBox(height: 16),
@@ -183,6 +264,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                         label: _assetType == 'crypto' ? 'Ticker' : 'Symbol',
                         hint: _assetType == 'crypto' ? 'BTC' : 'AAPL',
                         formatters: [_UpperCase()],
+                        onChanged: _onSymbolChanged,
                         validator: (v) => v == null || v.trim().isEmpty
                             ? 'Required'
                             : null,
@@ -223,6 +305,18 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                         hint: '150.00',
                         keyboard: const TextInputType.numberWithOptions(
                             decimal: true),
+                        suffix: _priceLoading
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.emerald),
+                                ),
+                              )
+                            : null,
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
                             return 'Required';
@@ -361,6 +455,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
     List<TextInputFormatter>? formatters,
     String? Function(String?)? validator,
     void Function(String)? onChanged,
+    Widget? suffix,
   }) =>
       TextFormField(
         controller: controller,
@@ -372,6 +467,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
+          suffixIcon: suffix,
           hintStyle: TextStyle(color: context.colors.textMuted, fontSize: 13),
           labelStyle:
               TextStyle(color: context.colors.textMuted, fontSize: 13),

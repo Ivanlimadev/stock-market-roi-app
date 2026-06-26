@@ -47,6 +47,13 @@ final portfolioHoldingsProvider =
       .toList();
 });
 
+/// Uppercase symbols currently held in the portfolio — for "is this in my
+/// portfolio?" checks (e.g. the add-to-portfolio button on the stock detail).
+final portfolioSymbolsProvider = Provider.autoDispose<Set<String>>((ref) {
+  final holdings = ref.watch(portfolioHoldingsProvider).valueOrNull ?? [];
+  return holdings.map((h) => h.symbol.toUpperCase()).toSet();
+});
+
 // Holdings enriched with live prices
 final portfolioEnrichedProvider =
     FutureProvider.autoDispose<List<PortfolioHolding>>((ref) async {

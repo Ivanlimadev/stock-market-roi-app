@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/ads/ad_manager.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/providers/profile_provider.dart';
@@ -254,6 +255,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               icon: Icons.description_rounded,
               label: 'Terms of Service',
               onTap: () => context.push('/terms'),
+            ),
+            // Ad privacy (GDPR) — only shown where consent is required.
+            FutureBuilder<bool>(
+              future: AdManager.instance.privacyOptionsRequired,
+              builder: (context, snap) => snap.data == true
+                  ? _Item(
+                      icon: Icons.ad_units_rounded,
+                      label: 'Ad Privacy Settings',
+                      onTap: AdManager.instance.showPrivacyOptions,
+                    )
+                  : const SizedBox.shrink(),
             ),
 
             const SizedBox(height: 8),

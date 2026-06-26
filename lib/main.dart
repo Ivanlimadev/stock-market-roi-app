@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/ads/ad_manager.dart';
 import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
@@ -32,6 +33,16 @@ Future<void> main() async {
   // Initialise after UI is running — avoids white screen when iOS shows
   // the notification permission dialog before runApp completes.
   NotificationService.initialize().ignore();
+
+  // Ads SDK — initialise after UI is up so the first frame isn't blocked.
+  AdManager.instance.initialize().ignore();
+
+  // Drive interstitial frequency off route changes (no-ad screens are filtered
+  // inside AdManager.onNavigation).
+  appRouter.routerDelegate.addListener(() {
+    AdManager.instance
+        .onNavigation(appRouter.routerDelegate.currentConfiguration.uri.path);
+  });
 }
 
 class App extends ConsumerWidget {

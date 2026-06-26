@@ -63,3 +63,13 @@ final stockAIInsightProvider = FutureProvider.autoDispose
   final res = await ApiClient.dio.get('/stocks/${symbol.toUpperCase()}/insight');
   return AIInsight.fromJson(res.data as Map<String, dynamic>);
 });
+
+/// Reduced insight (verdict + confidence + summary, no bull/bear) used for the
+/// free teaser. The full bull/bear analysis is only fetched via
+/// [stockAIInsightProvider] after the rewarded ad unlocks it.
+final stockAIInsightTeaserProvider = FutureProvider.autoDispose
+    .family<AIInsight, String>((ref, symbol) async {
+  final res = await ApiClient.dio
+      .get('/stocks/${symbol.toUpperCase()}/insight', queryParameters: {'teaser': '1'});
+  return AIInsight.fromJson(res.data as Map<String, dynamic>);
+});
