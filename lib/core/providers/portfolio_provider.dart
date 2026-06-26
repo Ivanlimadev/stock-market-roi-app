@@ -85,7 +85,11 @@ final portfolioEnrichedProvider =
   final holdings = await ref.watch(portfolioHoldingsProvider.future);
   if (holdings.isEmpty) return [];
 
-  final cryptoPrices = ref.watch(realtimePriceProvider);
+  // read (not watch): take a one-shot snapshot of realtime crypto prices so a
+  // WebSocket tick (many per second) doesn't re-run this provider — which made
+  // the page flash its loading spinner over and over. Refreshes on pull-to-
+  // refresh / invalidate.
+  final cryptoPrices = ref.read(realtimePriceProvider);
   final stockPrices = await ref.watch(_portfolioStockPricesProvider.future);
 
   return holdings.map((h) {
