@@ -94,9 +94,9 @@ class MainShellMenu {
   static Widget avatarButton() => Consumer(
         builder: (context, ref, _) {
           final c = context.colors;
-          final file = ref.watch(localAvatarProvider).valueOrNull;
+          final avatarUrl = ref.watch(profileProvider).valueOrNull?.avatarUrl;
           final loggedIn = Supabase.instance.client.auth.currentUser != null;
-          final hasPhoto = file != null;
+          final hasPhoto = avatarUrl != null;
           return Padding(
             padding: const EdgeInsets.only(right: 12, left: 2),
             child: GestureDetector(
@@ -104,7 +104,7 @@ class MainShellMenu {
               child: CircleAvatar(
                 radius: 15,
                 backgroundColor: c.surfaceAlt,
-                backgroundImage: hasPhoto ? FileImage(file) : null,
+                backgroundImage: hasPhoto ? NetworkImage(avatarUrl) : null,
                 child: hasPhoto
                     ? null
                     : Icon(Icons.person_rounded, size: 18, color: c.textMuted),

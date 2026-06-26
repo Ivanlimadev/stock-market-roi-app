@@ -4,10 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/profile_provider.dart';
-import '../../core/services/local_avatar_service.dart';
 
 /// Shown once, right after the user's first sign-in, inviting them to add a
-/// profile photo (stored locally on the device). Both "Choose photo" and
+/// profile photo (uploaded to Supabase Storage). Both "Choose photo" and
 /// "Skip" mark the prompt as seen (`photo_onboarded`) so it never shows again.
 class PhotoOnboardingPage extends ConsumerStatefulWidget {
   const PhotoOnboardingPage({super.key});
@@ -32,8 +31,8 @@ class _PhotoOnboardingPageState extends ConsumerState<PhotoOnboardingPage> {
   Future<void> _choosePhoto() async {
     setState(() => _busy = true);
     try {
-      final ok = await LocalAvatarService.pickAndSave();
-      if (ok) ref.invalidate(localAvatarProvider);
+      final ok = await ProfileService.pickAndUploadAvatar();
+      if (ok) ref.invalidate(profileProvider);
       // If the user cancelled the picker we keep them here to try again/skip.
       if (!ok) {
         if (mounted) setState(() => _busy = false);

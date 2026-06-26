@@ -8,7 +8,6 @@ import '../../core/ads/ad_manager.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/providers/profile_provider.dart';
-import '../../core/services/local_avatar_service.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
 final _appVersionProvider = FutureProvider<String>((ref) async {
@@ -114,8 +113,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     setState(() => _loading = true);
     try {
-      // Local-only avatar — drop it from the device before wiping the account.
-      await LocalAvatarService.remove();
+      // Drop the avatar from Storage before wiping the account.
+      await ProfileService.removeAvatar();
       await Supabase.instance.client.rpc('delete_user');
       await Supabase.instance.client.auth.signOut();
       if (mounted) context.go('/home');
@@ -360,8 +359,8 @@ class _UserStripState extends ConsumerState<_UserStrip> {
   Future<void> _changePhoto() async {
     setState(() => _busy = true);
     try {
-      final ok = await LocalAvatarService.pickAndSave();
-      if (ok) ref.invalidate(localAvatarProvider);
+      final ok = await ProfileService.pickAndUploadAvatar();
+      if (ok) ref.invalidate(profileProvider);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -375,8 +374,8 @@ class _UserStripState extends ConsumerState<_UserStrip> {
   Future<void> _removePhoto() async {
     setState(() => _busy = true);
     try {
-      await LocalAvatarService.remove();
-      ref.invalidate(localAvatarProvider);
+      await ProfileService.removeAvatar();
+      ref.invalidate(profileProvider);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -499,7 +498,7 @@ class _UserStripState extends ConsumerState<_UserStrip> {
     }
 
     final profile = ref.watch(profileProvider).valueOrNull;
-    final avatarFile = ref.watch(localAvatarProvider).valueOrNull;
+    final avatarUrl = profile?.avatarUrl;
     final email = user.email ?? '';
     final initials = email.isNotEmpty ? email[0].toUpperCase() : 'U';
     final name = (profile?.displayName?.isNotEmpty ?? false)
@@ -507,7 +506,7 @@ class _UserStripState extends ConsumerState<_UserStrip> {
         : 'My Account';
 
     return InkWell(
-      onTap: () => _showActions(profile, hasPhoto: avatarFile != null),
+      onTap: () => _showActions(profile, hasPhoto: avatarUrl != null),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(children: [
@@ -518,12 +517,12 @@ class _UserStripState extends ConsumerState<_UserStrip> {
               decoration: BoxDecoration(
                 color: AppColors.emerald.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(26),
-                image: avatarFile != null
+                image: avatarUrl != null
                     ? DecorationImage(
-                        image: FileImage(avatarFile), fit: BoxFit.cover)
+                        image: NetworkImage(avatarUrl), fit: BoxFit.cover)
                     : null,
               ),
-              child: avatarFile == null
+              child: avatarUrl == null
                   ? Center(
                       child: Text(initials,
                           style: const TextStyle(
