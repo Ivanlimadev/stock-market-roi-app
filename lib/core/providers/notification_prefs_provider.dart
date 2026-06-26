@@ -6,12 +6,16 @@ class NotificationPrefs {
   final bool dividendAlerts;
   final bool blogPosts;
   final bool monthlyReport;
+  final bool marketClose;
+  final bool marketOpen;
 
   const NotificationPrefs({
     this.priceAlerts = true,
     this.dividendAlerts = true,
     this.blogPosts = true,
     this.monthlyReport = true,
+    this.marketClose = true,
+    this.marketOpen = true,
   });
 
   factory NotificationPrefs.fromJson(Map<String, dynamic> j) => NotificationPrefs(
@@ -19,6 +23,8 @@ class NotificationPrefs {
         dividendAlerts: j['dividend_alerts'] as bool? ?? true,
         blogPosts: j['blog_posts'] as bool? ?? true,
         monthlyReport: j['monthly_report'] as bool? ?? true,
+        marketClose: j['market_close'] as bool? ?? true,
+        marketOpen: j['market_open'] as bool? ?? true,
       );
 }
 

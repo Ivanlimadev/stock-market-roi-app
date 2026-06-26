@@ -188,6 +188,8 @@ class NotificationService {
   //   dividend_alert→ data: { type, symbol }
   //   blog_post     → data: { type, slug }
   //   monthly_report→ data: { type }
+  //   market_close  → data: { type }
+  //   market_open   → data: { type, symbol }
   static void _navigateFromData(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     final symbol = (data['symbol'] as String?)?.toLowerCase();
@@ -196,11 +198,14 @@ class NotificationService {
     switch (type) {
       case 'price_alert':
       case 'dividend_alert':
+      case 'market_open':
         if (symbol != null) appRouter.push('/stocks/$symbol');
       case 'blog_post':
         if (slug != null) appRouter.push('/blog/$slug');
       case 'monthly_report':
         appRouter.push('/portfolio');
+      case 'market_close':
+        appRouter.push('/home');
     }
   }
 

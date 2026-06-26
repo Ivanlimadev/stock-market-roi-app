@@ -53,6 +53,20 @@ class _Prefs extends ConsumerWidget {
           ),
         ),
         _Toggle(
+          icon: Icons.wb_sunny_rounded,
+          title: 'Market Open · Earnings',
+          subtitle: 'Morning heads-up when your stocks report earnings today',
+          value: prefs.marketOpen,
+          onChanged: (v) => _set(ref, 'market_open', v),
+        ),
+        _Toggle(
+          icon: Icons.show_chart_rounded,
+          title: 'Market Close Summary',
+          subtitle: 'Daily recap of the market and how your stocks did',
+          value: prefs.marketClose,
+          onChanged: (v) => _set(ref, 'market_close', v),
+        ),
+        _Toggle(
           icon: Icons.notifications_active_rounded,
           title: 'Price Alerts',
           subtitle: 'When a stock or crypto hits your target price',
