@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -91,7 +92,7 @@ class NotificationService {
       badge: true,
       sound: true,
     );
-    print('[FCM] permission status: ${settings.authorizationStatus}');
+    debugPrint('[FCM] permission status: ${settings.authorizationStatus}');
     // iOS foreground notifications must be explicitly enabled
     await FirebaseMessaging.instance
         .setForegroundNotificationPresentationOptions(
@@ -212,23 +213,23 @@ class NotificationService {
   static Future<void> _saveToken() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      print('[FCM] _saveToken: no logged-in user, skipping');
+      debugPrint('[FCM] _saveToken: no logged-in user, skipping');
       return;
     }
 
     if (Platform.isIOS) {
       final apns = await FirebaseMessaging.instance.getAPNSToken();
-      print('[FCM] APNS token: ${apns == null ? "NULL (not ready)" : "present"}');
+      debugPrint('[FCM] APNS token: ${apns == null ? "NULL (not ready)" : "present"}');
     }
 
     String? token;
     try {
       token = await FirebaseMessaging.instance.getToken();
     } catch (e) {
-      print('[FCM] getToken() threw: $e');
+      debugPrint('[FCM] getToken() threw: $e');
       return;
     }
-    print('[FCM] _saveToken user=${user.id} '
+    debugPrint('[FCM] _saveToken user=${user.id} '
         'token=${token == null ? "NULL" : "${token.substring(0, 12)}…"}');
     if (token == null) return;
 
@@ -242,9 +243,9 @@ class NotificationService {
         },
         onConflict: 'user_id,token',
       );
-      print('[FCM] token upsert OK ✅');
+      debugPrint('[FCM] token upsert OK ✅');
     } catch (e) {
-      print('[FCM] upsert error: $e');
+      debugPrint('[FCM] upsert error: $e');
     }
   }
 }
