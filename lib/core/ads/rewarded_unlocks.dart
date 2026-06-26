@@ -13,6 +13,8 @@ class RewardedUnlocks {
   // Feature keys.
   static const secFilings = 'sec_filings';
   static const insiders = 'insiders';
+  static const financials = 'financials';
+  static const compare = 'compare';
 
   static final ValueNotifier<Set<String>> _unlocked =
       ValueNotifier<Set<String>>(<String>{});

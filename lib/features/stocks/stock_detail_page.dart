@@ -291,8 +291,15 @@ class _BodyState extends ConsumerState<_Body> {
         // ── Earnings History (quarterly EPS) ─────────────────────────────────
         _EarningsHistorySection(sym: sym),
 
-        // ── Financial Charts (revenue / net income) ───────────────────────────
-        _FinancialSection(sym: sym),
+        // ── Financial Charts (revenue / net income, rewarded-gated) ───────────
+        RewardedGate(
+          featureKey: RewardedUnlocks.financials,
+          icon: Icons.bar_chart_rounded,
+          title: 'Financials',
+          description: 'Watch a short ad to unlock revenue & net income charts — '
+              'stays unlocked for every stock this session.',
+          child: _FinancialSection(sym: sym),
+        ),
 
         // ── Key Statistics ───────────────────────────────────────────────────
         if (info != null) _KeyStats(info: info, stock: stock),
