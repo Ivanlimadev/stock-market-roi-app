@@ -34,15 +34,22 @@ class AdConfig {
   static const _iosAppOpenReal     = 'ca-app-pub-3940256099942544/5575463023';
   static const _androidAppOpenReal = 'ca-app-pub-3940256099942544/9257395921';
 
+  // Banner (collapsible) — TODO: create the Banner ad unit in the AdMob console
+  // and replace _iosBannerReal. Falls back to the test unit until then.
+  static const _iosBannerReal     = 'ca-app-pub-3940256099942544/2934735716';
+  static const _androidBannerReal = 'ca-app-pub-3940256099942544/6300978111';
+
   // ── Google official TEST IDs (safe for development) ───────────────────────
   static const _iosInterstitialTest     = 'ca-app-pub-3940256099942544/4411468910';
   static const _iosRewardedTest         = 'ca-app-pub-3940256099942544/1712485313';
   static const _iosNativeTest           = 'ca-app-pub-3940256099942544/3986624511';
   static const _iosAppOpenTest          = 'ca-app-pub-3940256099942544/5575463023';
+  static const _iosBannerTest           = 'ca-app-pub-3940256099942544/2934735716';
   static const _androidInterstitialTest = 'ca-app-pub-3940256099942544/1033173712';
   static const _androidRewardedTest     = 'ca-app-pub-3940256099942544/5224354917';
   static const _androidNativeTest       = 'ca-app-pub-3940256099942544/2247696110';
   static const _androidAppOpenTest      = 'ca-app-pub-3940256099942544/9257395921';
+  static const _androidBannerTest       = 'ca-app-pub-3940256099942544/6300978111';
 
   static bool get _isIOS => Platform.isIOS;
 
@@ -76,5 +83,13 @@ class AdConfig {
       return _isIOS ? _iosAppOpenTest : _androidAppOpenTest;
     }
     return _isIOS ? _iosAppOpenReal : _androidAppOpenReal;
+  }
+
+  /// Banner (collapsible) ad unit for the current platform/build mode.
+  static String get bannerUnitId {
+    if (kDebugMode) {
+      return _isIOS ? _iosBannerTest : _androidBannerTest;
+    }
+    return _isIOS ? _iosBannerReal : _androidBannerReal;
   }
 }

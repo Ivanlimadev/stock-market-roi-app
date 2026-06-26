@@ -14,6 +14,7 @@ import '../../core/models/blog_post_model.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/ads/ad_manager.dart';
+import '../../core/ads/collapsible_banner_ad.dart';
 import '../../core/ads/rewarded_gate.dart';
 import '../../core/ads/rewarded_unlocks.dart';
 import '../../core/providers/watchlist_provider.dart';
@@ -106,7 +107,13 @@ class StockDetailPage extends ConsumerWidget {
           MainShellMenu.settingsButton(),
         ],
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CollapsibleBannerAd(),
+          AppBottomNav(),
+        ],
+      ),
       body: async.when(
         loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
         error: (e, _) => Center(
