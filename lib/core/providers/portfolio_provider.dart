@@ -54,29 +54,49 @@ final portfolioSymbolsProvider = Provider.autoDispose<Set<String>>((ref) {
   return holdings.map((h) => h.symbol.toUpperCase()).toSet();
 });
 
-// Holdings enriched with live prices
+// Live prices for the stock holdings, fetched once. This deliberately does NOT
+// watch the realtime crypto feed, so it isn't re-fetched on every WebSocket
+// tick (which previously hammered the API and made the page reload-loop).
+final _portfolioStockPricesProvider =
+    FutureProvider.autoDispose<Map<String, double>>((ref) async {
+  final holdings = await ref.watch(portfolioHoldingsProvider.future);
+  final symbols = holdings
+      .where((h) => h.assetType != 'crypto')
+      .map((h) => h.symbol)
+      .toSet();
+  final prices = <String, double>{};
+  await Future.wait(symbols.map((sym) async {
+    try {
+      final res = await ApiClient.dio.get('/stocks/$sym');
+      final info = res.data?['info'] as Map<String, dynamic>?;
+      final price = (info?['currentPrice'] as num?)?.toDouble() ??
+          (info?['price'] as num?)?.toDouble();
+      if (price != null && price > 0) prices[sym] = price;
+    } catch (_) {}
+  }));
+  return prices;
+});
+
+// Holdings enriched with live prices: stock prices come from the cached
+// provider above; crypto prices are reactive from the realtime feed. They're
+// combined in-memory, so a crypto tick re-renders without re-fetching stocks.
 final portfolioEnrichedProvider =
     FutureProvider.autoDispose<List<PortfolioHolding>>((ref) async {
   final holdings = await ref.watch(portfolioHoldingsProvider.future);
   if (holdings.isEmpty) return [];
 
   final cryptoPrices = ref.watch(realtimePriceProvider);
+  final stockPrices = await ref.watch(_portfolioStockPricesProvider.future);
 
-  return await Future.wait(holdings.map((h) async {
+  return holdings.map((h) {
     if (h.assetType == 'crypto') {
       final coinId = kCryptoTickerToCoinId[h.symbol.toUpperCase()];
       final price = coinId != null ? cryptoPrices[coinId] : null;
       return price != null ? h.withPrice(price) : h;
     }
-    try {
-      final res = await ApiClient.dio.get('/stocks/${h.symbol}');
-      final info = res.data?['info'] as Map<String, dynamic>?;
-      final price = (info?['currentPrice'] as num?)?.toDouble() ??
-          (info?['price'] as num?)?.toDouble();
-      if (price != null && price > 0) return h.withPrice(price);
-    } catch (_) {}
-    return h;
-  }));
+    final price = stockPrices[h.symbol];
+    return price != null ? h.withPrice(price) : h;
+  }).toList();
 });
 
 // Dividend info for each non-crypto holding
