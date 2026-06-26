@@ -28,15 +28,14 @@ class AdConfig {
   static const _iosNativeReal     = 'ca-app-pub-7113858977365190/9172073158';
   static const _androidNativeReal = 'ca-app-pub-3940256099942544/2247696110';
 
-  // App Open — TODO: create the App Open ad unit in the AdMob console and
-  // replace _iosAppOpenReal. Until then it falls back to Google's test unit so
-  // release builds won't crash (but earn nothing from App Open).
-  static const _iosAppOpenReal     = 'ca-app-pub-3940256099942544/5575463023';
+  // App Open — iOS real (created in console). Android still a test placeholder
+  // until the Android app + App Open unit are created.
+  static const _iosAppOpenReal     = 'ca-app-pub-7113858977365190/6671882378';
   static const _androidAppOpenReal = 'ca-app-pub-3940256099942544/9257395921';
 
-  // Banner (collapsible) — TODO: create the Banner ad unit in the AdMob console
-  // and replace _iosBannerReal. Falls back to the test unit until then.
-  static const _iosBannerReal     = 'ca-app-pub-3940256099942544/2934735716';
+  // Banner (collapsible) — iOS real (created in console). Android still a test
+  // placeholder until the Android app + banner unit are created.
+  static const _iosBannerReal     = 'ca-app-pub-7113858977365190/5470481348';
   static const _androidBannerReal = 'ca-app-pub-3940256099942544/6300978111';
 
   // ── Google official TEST IDs (safe for development) ───────────────────────
