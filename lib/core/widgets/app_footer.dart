@@ -60,6 +60,25 @@ class AppFooter extends StatelessWidget {
           ),
 
           SizedBox(height: 14),
+
+          // ── Follow us ─────────────────────────────────────────────────
+          Text('FOLLOW US',
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                  color: c.textMuted, letterSpacing: 0.8)),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              _SocialLink(icon: Icons.smart_display_rounded, label: 'YouTube',
+                  color: AppColors.red,
+                  url: 'https://www.youtube.com/@StockMarketRoi'),
+              SizedBox(width: 16),
+              _SocialLink(icon: Icons.music_note_rounded, label: 'TikTok',
+                  color: c.textPrimary,
+                  url: 'https://www.tiktok.com/@stock.market.roi'),
+            ],
+          ),
+
+          SizedBox(height: 14),
           Divider(color: c.surfaceAlt, height: 1),
           SizedBox(height: 12),
 
@@ -132,6 +151,35 @@ class _FooterLink extends StatelessWidget {
         SizedBox(width: 4),
         Text(label,
             style: TextStyle(fontSize: 11, color: AppColors.emerald,
+                fontWeight: FontWeight.w500)),
+      ],
+    ),
+  );
+}
+
+class _SocialLink extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final String url;
+  const _SocialLink({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.url,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () =>
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: color,
                 fontWeight: FontWeight.w500)),
       ],
     ),
