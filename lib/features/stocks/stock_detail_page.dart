@@ -678,12 +678,12 @@ class _KeyStatsState extends State<_KeyStats> {
       if ((info.dividendYield ?? 0) > 0)
         ('Dividends', [
           ('Dividend Yield',  fmtPct(info.dividendYield)),
-          ('Dividendo Anual', info.dividendRate != null ? '\$${fmtN(info.dividendRate)}' : '—'),
+          ('Annual Dividend', info.dividendRate != null ? '\$${fmtN(info.dividendRate)}' : '—'),
           ('Ex-Dividend',     info.exDividendDate ?? '—'),
           ('Payout Ratio',    info.payoutRatio != null ? '${(info.payoutRatio! * 100).toStringAsFixed(1)}%' : '—'),
         ].where((r) => r.$2 != '—').toList()),
       if (info.profitMargin != null || info.roe != null)
-        ('Rentabilidade', [
+        ('Return', [
           ('Net Margin',      info.profitMargin   != null ? '${(info.profitMargin! * 100).toStringAsFixed(1)}%' : '—'),
           ('Op. Margin',      info.operatingMargin != null ? '${(info.operatingMargin! * 100).toStringAsFixed(1)}%' : '—'),
           ('ROE',             info.roe != null ? '${(info.roe! * 100).toStringAsFixed(1)}%' : '—'),
@@ -796,7 +796,7 @@ class _DividendsCard extends StatelessWidget {
                   ],
                   if (info?.dividendRate != null) ...[
                     SizedBox(width: 10),
-                    _DivChip('Anual', '\$${info!.dividendRate!.toStringAsFixed(2)}'),
+                    _DivChip('Annual', '\$${info!.dividendRate!.toStringAsFixed(2)}'),
                   ],
                 ],
               ),

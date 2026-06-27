@@ -219,7 +219,7 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
           ),
           SizedBox(width: 12),
           _KpiCard(
-            label: 'Investido',
+            label: 'Invested',
             value: fmt.format(_totalInvested),
             icon: Icons.payments_rounded,
             color: const Color(0xFF6366F1),
@@ -240,7 +240,7 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
           ),
           SizedBox(width: 12),
           _KpiCard(
-            label: 'Rentabilidade',
+            label: 'Return',
             value: '${_totalGainPct >= 0 ? '+' : ''}${_totalGainPct.toStringAsFixed(2)}%',
             icon: Icons.percent_rounded,
             color: _totalGainPct >= 0 ? AppColors.emerald : AppColors.red,
@@ -1241,7 +1241,7 @@ class _DividendosTab extends ConsumerWidget {
             SizedBox(height: 12),
             Row(children: [
               _KpiCard(
-                label: 'Anual estimado',
+                label: 'Est. annual',
                 value: '\$${totalAnual.toStringAsFixed(2)}',
                 icon: Icons.savings_rounded,
                 color: AppColors.emerald,
