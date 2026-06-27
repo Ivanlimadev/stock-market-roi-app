@@ -579,7 +579,7 @@ class _MarketsBody extends ConsumerStatefulWidget {
 }
 
 class _MarketsBodyState extends ConsumerState<_MarketsBody> {
-  int _rankTab = 0; // 0=Gainers 1=Losers 2=Active 3=Dividend 4=Trending
+  int _rankTab = 3; // default Dividend (0=Gainers 1=Losers 2=Active 3=Dividend 4=Trending)
 
   @override
   Widget build(BuildContext context) {
@@ -676,10 +676,10 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  _RankChip(label: 'Dividend', idx: 3, current: _rankTab, onTap: (v) => setState(() => _rankTab = v)),
                   _RankChip(label: 'Gainers',  idx: 0, current: _rankTab, onTap: (v) => setState(() => _rankTab = v)),
                   _RankChip(label: 'Losers',   idx: 1, current: _rankTab, onTap: (v) => setState(() => _rankTab = v)),
                   _RankChip(label: 'Active',   idx: 2, current: _rankTab, onTap: (v) => setState(() => _rankTab = v)),
-                  _RankChip(label: 'Dividend', idx: 3, current: _rankTab, onTap: (v) => setState(() => _rankTab = v)),
                   _RankChip(label: 'Trending', idx: 4, current: _rankTab, onTap: (v) => setState(() => _rankTab = v)),
                 ],
               ),
@@ -695,6 +695,44 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
               ).toList(),
             ),
           ),
+
+          // ── 3b. Calculators (most-used) ────────────────────────────────
+          _SectionHeader(
+            title: 'Calculators',
+            trailing: GestureDetector(
+              onTap: () => context.push('/calculators'),
+              child: Text('See all',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.emerald)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: const [
+                Expanded(
+                    child: _CalcCard(
+                        icon: Icons.trending_up_rounded,
+                        label: 'Compound',
+                        route: '/calculators/compound-interest')),
+                SizedBox(width: 10),
+                Expanded(
+                    child: _CalcCard(
+                        icon: Icons.calendar_month_rounded,
+                        label: 'DCA',
+                        route: '/calculators/dca')),
+                SizedBox(width: 10),
+                Expanded(
+                    child: _CalcCard(
+                        icon: Icons.percent_rounded,
+                        label: 'ROI',
+                        route: '/calculators/roi')),
+              ],
+            ),
+          ),
+          SizedBox(height: 8),
 
           // ── 4. Calendar: Dividends & Earnings ─────────────────────────
           _SectionHeader(title: 'Calendar'),
@@ -896,6 +934,43 @@ class _ChangeBadge extends StatelessWidget {
       style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
     ),
   );
+}
+
+// ── Calculator card ───────────────────────────────────────────────────────────
+
+class _CalcCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String route;
+  const _CalcCard({required this.icon, required this.label, required this.route});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: () => context.push(route),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.border),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.emerald, size: 22),
+            const SizedBox(height: 8),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: c.textPrimary)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Heatmap card ──────────────────────────────────────────────────────────────
