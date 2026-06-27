@@ -186,7 +186,10 @@ final appRouter = GoRouter(
       routes: [
         GoRoute(path: '/home',      builder: (_, $) => const HomePage()),
         GoRoute(path: '/finance',   builder: (_, $) => const FinanceManagerPage()),
-        GoRoute(path: '/portfolio', builder: (_, $) => const PortfolioPage()),
+        GoRoute(
+            path: '/portfolio',
+            builder: (_, $) =>
+                PortfolioPage(initialTab: $.uri.queryParameters['tab'])),
         GoRoute(path: '/news',      builder: (_, $) => const NewsPage()),
         GoRoute(path: '/us-macro',  builder: (_, $) => const UsMacroPage()),
       ],

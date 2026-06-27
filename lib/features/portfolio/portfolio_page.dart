@@ -39,20 +39,23 @@ IconData _typeIcon(String type) => switch (type) {
 // ── Root page ─────────────────────────────────────────────────────────────────
 
 class PortfolioPage extends StatelessWidget {
-  const PortfolioPage({super.key});
+  /// Optional initial tab ('dividends' | 'holdings'), e.g. from a deep link.
+  final String? initialTab;
+  const PortfolioPage({super.key, this.initialTab});
 
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return const _GuestPortfolio();
-    return const _LoggedInPortfolio();
+    return _LoggedInPortfolio(initialTab: initialTab);
   }
 }
 
 // ── Logged-in portfolio ───────────────────────────────────────────────────────
 
 class _LoggedInPortfolio extends ConsumerStatefulWidget {
-  const _LoggedInPortfolio();
+  final String? initialTab;
+  const _LoggedInPortfolio({this.initialTab});
 
   @override
   ConsumerState<_LoggedInPortfolio> createState() => _LoggedInPortfolioState();
@@ -65,7 +68,15 @@ class _LoggedInPortfolioState extends ConsumerState<_LoggedInPortfolio>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: switch (widget.initialTab) {
+        'dividends' => 1,
+        'holdings' => 2,
+        _ => 0,
+      },
+    );
   }
 
   @override

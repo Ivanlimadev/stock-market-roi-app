@@ -198,9 +198,10 @@ class NotificationService {
 
     switch (type) {
       case 'price_alert':
-      case 'dividend_alert':
       case 'market_open':
         if (symbol != null) appRouter.push('/stocks/$symbol');
+      case 'dividend_alert':
+        appRouter.push('/portfolio?tab=dividends');
       case 'blog_post':
         if (slug != null) appRouter.push('/blog/$slug');
       case 'monthly_report':
