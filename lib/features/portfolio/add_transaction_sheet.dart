@@ -672,6 +672,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
       }
       _selectedSymbol = q.symbol.toUpperCase();
       _resolvedName = q.name;
+      _assetType = _assetTypeFor(q); // auto-set the chip from the asset's class
       if (q.price > 0 && _priceUntouched) {
         final text = q.price.toStringAsFixed(2);
         _priceCtrl.text = text;
@@ -679,6 +680,17 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
       }
     });
     if (unfocus) FocusScope.of(context).unfocus();
+  }
+
+  /// Classifies a screener asset into the sheet's chip types using the
+  /// backend's `sector`/`industry` (ETFs carry sector "ETFs"; REITs carry an
+  /// "REIT—…" industry). Everything else is a plain stock.
+  String _assetTypeFor(StockQuote q) {
+    final sector = (q.sector ?? '').toLowerCase();
+    final industry = (q.industry ?? '').toLowerCase();
+    if (sector == 'etfs' || sector == 'etf') return 'etf';
+    if (industry.contains('reit')) return 'reit';
+    return 'stock';
   }
 
   void _confirmCrypto(String sym, {bool setText = true, bool unfocus = true}) {
