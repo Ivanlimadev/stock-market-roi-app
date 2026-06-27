@@ -1091,7 +1091,16 @@ class _DividendosTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
           children: [
-            // KPIs
+            // ── Dividends actually received ──────────────────────────────────
+            const _ReceivedDividendsSection(),
+
+            // ── Forward estimate ─────────────────────────────────────────────
+            Text('Forward estimate',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: context.colors.textPrimary)),
+            SizedBox(height: 12),
             Row(children: [
               _KpiCard(
                 label: 'Anual estimado',
@@ -1170,6 +1179,145 @@ class _DividendosTab extends ConsumerWidget {
     } catch (_) {
       return iso;
     }
+  }
+}
+
+// ── Dividends received (history) ──────────────────────────────────────────────
+
+class _ReceivedDividendsSection extends ConsumerWidget {
+  const _ReceivedDividendsSection();
+
+  static String _ym(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}';
+
+  static const _monthInitials = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final async = ref.watch(portfolioReceivedDividendsProvider);
+
+    return async.maybeWhen(
+      data: (list) {
+        if (list.isEmpty) return const SizedBox.shrink();
+
+        final now = DateTime.now();
+        final months =
+            List.generate(12, (i) => DateTime(now.year, now.month - 11 + i));
+        final byMonth = {for (final m in months) _ym(m): 0.0};
+        var total12 = 0.0;
+        for (final r in list) {
+          final key = _ym(r.date);
+          if (byMonth.containsKey(key)) {
+            byMonth[key] = byMonth[key]! + r.amount;
+            total12 += r.amount;
+          }
+        }
+        final avgMonth = total12 / 12;
+        final maxBar = byMonth.values.fold(0.0, (m, v) => v > m ? v : m);
+        final fmt = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Text('Dividends received',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: c.textPrimary)),
+              const SizedBox(width: 6),
+              Text('· estimated',
+                  style: TextStyle(fontSize: 11, color: c.textMuted)),
+            ]),
+            const SizedBox(height: 12),
+            Row(children: [
+              _KpiCard(
+                label: 'Received 12m',
+                value: fmt.format(total12),
+                icon: Icons.savings_rounded,
+                color: AppColors.emerald,
+                sensitive: true,
+              ),
+              const SizedBox(width: 12),
+              _KpiCard(
+                label: 'Avg / month',
+                value: fmt.format(avgMonth),
+                icon: Icons.calendar_month_rounded,
+                color: const Color(0xFF6366F1),
+                sensitive: true,
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              decoration: BoxDecoration(
+                color: c.surface,
+                border: Border.all(color: c.border),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Last 12 months',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: c.textPrimary)),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 120,
+                    child: BarChart(BarChartData(
+                      maxY: maxBar <= 0 ? 1 : maxBar * 1.25,
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      barTouchData: BarTouchData(enabled: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (v, meta) {
+                              final i = v.toInt();
+                              if (i < 0 || i >= 12) return const SizedBox();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                    _monthInitials[months[i].month - 1],
+                                    style: TextStyle(
+                                        fontSize: 9, color: c.textMuted)),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      barGroups: [
+                        for (var i = 0; i < 12; i++)
+                          BarChartGroupData(x: i, barRods: [
+                            BarChartRodData(
+                              toY: byMonth[_ym(months[i])]!,
+                              color: AppColors.emerald,
+                              width: 9,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ]),
+                      ],
+                    )),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
   }
 }
 

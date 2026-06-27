@@ -151,6 +151,52 @@ final portfolioDividendsProvider =
   }));
 });
 
+// Dividends the user actually received, computed from their transaction
+// history × each stock's dividend payment history (from /stocks/{sym}). For a
+// payment on its ex-date, counts the net shares held strictly before that date.
+// Estimate: ignores stock splits between the payment and today.
+final portfolioReceivedDividendsProvider =
+    FutureProvider.autoDispose<List<ReceivedDividend>>((ref) async {
+  final txs = await ref.watch(portfolioTransactionsProvider.future);
+  final symbols = txs
+      .where((t) => t.assetType != 'crypto')
+      .map((t) => t.symbol)
+      .toSet();
+  if (symbols.isEmpty) return [];
+
+  final result = <ReceivedDividend>[];
+  await Future.wait(symbols.map((sym) async {
+    try {
+      final res = await ApiClient.dio.get('/stocks/$sym');
+      final divs = (res.data?['dividends'] as List?) ?? const [];
+      final symTx = txs.where((t) => t.symbol == sym).toList();
+
+      for (final d in divs) {
+        final m = d as Map<String, dynamic>;
+        final perShare = (m['dividend'] as num?)?.toDouble();
+        final exDate = DateTime.tryParse(m['date'] as String? ?? '');
+        if (perShare == null || perShare <= 0 || exDate == null) continue;
+
+        // Net shares held strictly before the ex-dividend date.
+        var shares = 0.0;
+        for (final t in symTx) {
+          final td = DateTime.tryParse(t.date);
+          if (td != null && td.isBefore(exDate)) {
+            shares += t.type == 'buy' ? t.quantity : -t.quantity;
+          }
+        }
+        if (shares > 1e-9) {
+          result.add(ReceivedDividend(
+              symbol: sym, date: exDate, perShare: perShare, shares: shares));
+        }
+      }
+    } catch (_) {}
+  }));
+
+  result.sort((a, b) => a.date.compareTo(b.date));
+  return result;
+});
+
 // Full transaction history
 final portfolioTransactionsProvider =
     FutureProvider.autoDispose<List<PortfolioTransaction>>((ref) async {

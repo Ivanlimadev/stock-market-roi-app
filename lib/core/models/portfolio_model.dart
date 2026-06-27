@@ -138,6 +138,24 @@ class DividendInfo {
           : 0;
 }
 
+/// A dividend payment the user actually earned: shares held as of the
+/// ex-dividend date × the dividend per share. Estimated — ignores stock
+/// splits between the payment date and today.
+class ReceivedDividend {
+  final String symbol;
+  final DateTime date; // ex-dividend date
+  final double perShare;
+  final double shares;
+  double get amount => perShare * shares;
+
+  const ReceivedDividend({
+    required this.symbol,
+    required this.date,
+    required this.perShare,
+    required this.shares,
+  });
+}
+
 class PortfolioSnapshot {
   final String date; // YYYY-MM-DD
   final double totalValue;
