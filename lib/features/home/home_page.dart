@@ -8,6 +8,9 @@ import '../../core/providers/screener_provider.dart';
 import '../../core/providers/crypto_provider.dart';
 import '../../core/providers/blog_provider.dart';
 import '../../core/providers/watchlist_provider.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/providers/portfolio_provider.dart' hide StockQuote;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/market_model.dart';
 import '../../core/models/crypto_model.dart';
 import '../../core/models/blog_post_model.dart';
@@ -489,6 +492,86 @@ class _SearchPostCard extends StatelessWidget {
 
 // ── Markets body ──────────────────────────────────────────────────────────────
 
+/// Greets the signed-in user and shows their total portfolio balance at the
+/// top of the Markets/Home screen.
+class _WelcomeHeader extends ConsumerWidget {
+  const _WelcomeHeader();
+
+  String _fallbackName() {
+    final email = Supabase.instance.client.auth.currentUser?.email;
+    if (email != null && email.contains('@')) {
+      final prefix = email.split('@').first;
+      if (prefix.isNotEmpty) {
+        return prefix[0].toUpperCase() + prefix.substring(1);
+      }
+    }
+    return 'Investor';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final profile = ref.watch(profileProvider);
+    final holdings = ref.watch(portfolioEnrichedProvider);
+
+    final name = profile.maybeWhen(
+      data: (p) {
+        final dn = p?.displayName?.trim();
+        return (dn != null && dn.isNotEmpty) ? dn : _fallbackName();
+      },
+      orElse: _fallbackName,
+    );
+
+    final total = holdings.maybeWhen(
+      data: (list) => list.fold<double>(0, (s, h) => s + h.currentValue),
+      orElse: () => null,
+    );
+    final fmt = NumberFormat.simpleCurrency(locale: 'en_US');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Welcome back,',
+                    style: TextStyle(fontSize: 13, color: c.textMuted)),
+                const SizedBox(height: 2),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: c.textPrimary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('Portfolio balance',
+                  style: TextStyle(fontSize: 11, color: c.textMuted)),
+              const SizedBox(height: 2),
+              Text(
+                total == null ? '—' : fmt.format(total),
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.emerald),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MarketsBody extends ConsumerStatefulWidget {
   const _MarketsBody();
   @override
@@ -539,6 +622,9 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
       },
       child: ListView(
         children: [
+
+          // ── 0. Welcome + portfolio balance ─────────────────────────────
+          const _WelcomeHeader(),
 
           // ── 1. Index Cards ─────────────────────────────────────────────
           marketAsync.when(
