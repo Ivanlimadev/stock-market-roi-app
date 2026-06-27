@@ -347,11 +347,11 @@ class _BodyState extends ConsumerState<_Body> {
           child: _InsiderSection(sym: sym),
         ),
 
-        // ── Related Articles ──────────────────────────────────────────────────
-        _RelatedArticles(sym: sym),
-
         // ── Discussion ────────────────────────────────────────────────────────
         CommentsSection(target: (type: 'stock', id: sym)),
+
+        // ── Related Articles ──────────────────────────────────────────────────
+        _RelatedArticles(sym: sym),
 
         // ── Footer ────────────────────────────────────────────────────────────
         const AppFooter(),
