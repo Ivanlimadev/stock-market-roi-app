@@ -336,7 +336,7 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
                 style: TextStyle(fontSize: 13, color: c.textSecond, height: 1.4),
               ),
               const SizedBox(height: 16),
-              Text('Type APAGAR to confirm',
+              Text('Type DELETE to confirm',
                   style: TextStyle(fontSize: 12, color: c.textMuted)),
               const SizedBox(height: 8),
               TextField(
@@ -347,7 +347,7 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
                     fontSize: 14,
                     fontWeight: FontWeight.w700),
                 decoration: InputDecoration(
-                  hintText: 'APAGAR',
+                  hintText: 'DELETE',
                   hintStyle: TextStyle(color: c.textMuted),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -369,7 +369,7 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
               child: Text('Cancel', style: TextStyle(color: c.textMuted)),
             ),
             FilledButton(
-              onPressed: ctrl.text == 'APAGAR'
+              onPressed: ctrl.text.trim().toUpperCase() == 'DELETE'
                   ? () => Navigator.of(ctx).pop(true)
                   : null,
               style: FilledButton.styleFrom(
