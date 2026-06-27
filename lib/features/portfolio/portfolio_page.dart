@@ -263,6 +263,17 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
 
         SizedBox(height: 24),
 
+        // ── Portfolio value · monthly bars ──────────────────────────────────
+        snapshots.maybeWhen(
+          data: (snaps) => snaps.isEmpty
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: _PortfolioValueBars(snapshots: snaps),
+                ),
+          orElse: () => const SizedBox.shrink(),
+        ),
+
         // ── Allocation donut ────────────────────────────────────────────────
         _AllocationSection(holdings: widget.holdings),
         SizedBox(height: 24),
@@ -505,6 +516,122 @@ class _KpiCard extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Portfolio value · monthly bars ────────────────────────────────────────────
+
+/// A 12-month bar chart of portfolio value. Each bar is the latest snapshot
+/// value within that month, carried forward across months with no snapshot so
+/// every bar reflects the portfolio's value at that point in time.
+class _PortfolioValueBars extends StatelessWidget {
+  final List<PortfolioSnapshot> snapshots;
+  const _PortfolioValueBars({required this.snapshots});
+
+  static String _ym(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}';
+  static const _monthInitials = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final now = DateTime.now();
+    final months =
+        List.generate(12, (i) => DateTime(now.year, now.month - 11 + i, 1));
+
+    final sorted = [...snapshots]..sort((a, b) => a.date.compareTo(b.date));
+    final byMonth = <String, double>{};
+    var carry = 0.0;
+    var si = 0;
+    for (final m in months) {
+      final monthEnd = DateTime(m.year, m.month + 1, 0, 23, 59, 59);
+      while (si < sorted.length) {
+        final d = DateTime.tryParse(sorted[si].date);
+        if (d != null && !d.isAfter(monthEnd)) {
+          carry = sorted[si].totalValue;
+          si++;
+        } else {
+          break;
+        }
+      }
+      byMonth[_ym(m)] = carry;
+    }
+    final maxBar = byMonth.values.fold(0.0, (mx, v) => v > mx ? v : mx);
+    if (maxBar <= 0) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Portfolio value',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: c.textPrimary)),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border.all(color: c.border),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Last 12 months',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: c.textPrimary)),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 120,
+                child: BarChart(BarChartData(
+                  maxY: maxBar * 1.25,
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  barTouchData: BarTouchData(enabled: false),
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (v, meta) {
+                          final i = v.toInt();
+                          if (i < 0 || i >= 12) return const SizedBox();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(_monthInitials[months[i].month - 1],
+                                style: TextStyle(
+                                    fontSize: 9, color: c.textMuted)),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barGroups: [
+                    for (var i = 0; i < 12; i++)
+                      BarChartGroupData(x: i, barRods: [
+                        BarChartRodData(
+                          toY: byMonth[_ym(months[i])]!,
+                          color: AppColors.emerald,
+                          width: 9,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ]),
+                  ],
+                )),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
