@@ -24,6 +24,7 @@ import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
 import '../../core/utils/share_utils.dart';
 import '../../core/widgets/app_footer.dart';
+import '../../core/widgets/comments_section.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../core/widgets/auth_prompt_sheet.dart';
 
@@ -348,6 +349,9 @@ class _BodyState extends ConsumerState<_Body> {
 
         // ── Related Articles ──────────────────────────────────────────────────
         _RelatedArticles(sym: sym),
+
+        // ── Discussion ────────────────────────────────────────────────────────
+        CommentsSection(target: (type: 'stock', id: sym)),
 
         // ── Footer ────────────────────────────────────────────────────────────
         const AppFooter(),
