@@ -54,27 +54,37 @@ final portfolioSymbolsProvider = Provider.autoDispose<Set<String>>((ref) {
   return holdings.map((h) => h.symbol.toUpperCase()).toSet();
 });
 
-// Live prices for the stock holdings, fetched once. This deliberately does NOT
+/// Live quote for a stock holding: price + today's change % + sector.
+typedef StockQuote = ({double price, double? changePct, String? sector});
+
+// Live quotes for the stock holdings, fetched once. This deliberately does NOT
 // watch the realtime crypto feed, so it isn't re-fetched on every WebSocket
 // tick (which previously hammered the API and made the page reload-loop).
 final _portfolioStockPricesProvider =
-    FutureProvider.autoDispose<Map<String, double>>((ref) async {
+    FutureProvider.autoDispose<Map<String, StockQuote>>((ref) async {
   final holdings = await ref.watch(portfolioHoldingsProvider.future);
   final symbols = holdings
       .where((h) => h.assetType != 'crypto')
       .map((h) => h.symbol)
       .toSet();
-  final prices = <String, double>{};
+  final quotes = <String, StockQuote>{};
   await Future.wait(symbols.map((sym) async {
     try {
       final res = await ApiClient.dio.get('/stocks/$sym');
-      final info = res.data?['info'] as Map<String, dynamic>?;
-      final price = (info?['currentPrice'] as num?)?.toDouble() ??
-          (info?['price'] as num?)?.toDouble();
-      if (price != null && price > 0) prices[sym] = price;
+      final data = res.data as Map<String, dynamic>?;
+      // Price/change live at the response root; sector is under `info`.
+      final price = (data?['currentPrice'] as num?)?.toDouble();
+      if (price != null && price > 0) {
+        final info = data?['info'] as Map<String, dynamic>?;
+        quotes[sym] = (
+          price: price,
+          changePct: (data?['changePct'] as num?)?.toDouble(),
+          sector: info?['sector'] as String?,
+        );
+      }
     } catch (_) {}
   }));
-  return prices;
+  return quotes;
 });
 
 // Holdings enriched with live prices: stock prices come from the cached
@@ -90,7 +100,7 @@ final portfolioEnrichedProvider =
   // the page flash its loading spinner over and over. Refreshes on pull-to-
   // refresh / invalidate.
   final cryptoPrices = ref.read(realtimePriceProvider);
-  final stockPrices = await ref.watch(_portfolioStockPricesProvider.future);
+  final stockQuotes = await ref.watch(_portfolioStockPricesProvider.future);
 
   return holdings.map((h) {
     if (h.assetType == 'crypto') {
@@ -98,8 +108,10 @@ final portfolioEnrichedProvider =
       final price = coinId != null ? cryptoPrices[coinId] : null;
       return price != null ? h.withPrice(price) : h;
     }
-    final price = stockPrices[h.symbol];
-    return price != null ? h.withPrice(price) : h;
+    final q = stockQuotes[h.symbol];
+    return q != null
+        ? h.withPrice(q.price, dayChangePct: q.changePct, sector: q.sector)
+        : h;
   }).toList();
 });
 
@@ -123,10 +135,14 @@ final portfolioDividendsProvider =
         exDividendDate: info?['exDividendDate'] as String?,
         dividendDate: info?['dividendDate'] as String?,
         payoutRatio: (info?['payoutRatio'] as num?)?.toDouble(),
+        costPerShare: h.avgPrice,
       );
     } catch (_) {
       return DividendInfo(
-          symbol: h.symbol, assetType: h.assetType, netShares: h.netShares);
+          symbol: h.symbol,
+          assetType: h.assetType,
+          netShares: h.netShares,
+          costPerShare: h.avgPrice);
     }
   }));
 });

@@ -236,7 +236,9 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
                 fontWeight: FontWeight.w600,
                 color: context.colors.textPrimary)),
         SizedBox(height: 12),
-        ...widget.holdings.take(5).map((h) => _HoldingTile(holding: h)),
+        ...widget.holdings
+            .take(5)
+            .map((h) => _HoldingTile(holding: h, portfolioValue: _totalValue)),
       ],
     );
   }
@@ -251,16 +253,18 @@ class _PortfolioHistoryChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c      = context.colors;
-    final values = snapshots.map((s) => s.totalValue).toList();
-    final minY   = values.reduce((a, b) => a < b ? a : b) * 0.98;
-    final maxY   = values.reduce((a, b) => a > b ? a : b) * 1.02;
-    final isPos  = values.last >= values.first;
-    final color  = isPos ? AppColors.emerald : AppColors.red;
+    final values   = snapshots.map((s) => s.totalValue).toList();
+    final invested = snapshots.map((s) => s.totalInvested).toList();
+    final all      = [...values, ...invested];
+    final minY     = all.reduce((a, b) => a < b ? a : b) * 0.98;
+    final maxY     = all.reduce((a, b) => a > b ? a : b) * 1.02;
+    final isPos    = values.last >= values.first;
+    final color    = isPos ? AppColors.emerald : AppColors.red;
 
-    final spots = List.generate(
-      snapshots.length,
-      (i) => FlSpot(i.toDouble(), snapshots[i].totalValue),
-    );
+    final valueSpots = List.generate(snapshots.length,
+        (i) => FlSpot(i.toDouble(), snapshots[i].totalValue));
+    final investedSpots = List.generate(snapshots.length,
+        (i) => FlSpot(i.toDouble(), snapshots[i].totalInvested));
 
     return Container(
       decoration: BoxDecoration(
@@ -285,6 +289,16 @@ class _PortfolioHistoryChart extends StatelessWidget {
                 color: color,
                 fontWeight: FontWeight.w600),
           ),
+          const SizedBox(height: 8),
+          Row(children: [
+            Container(width: 10, height: 2, color: color),
+            Text(' Value',
+                style: TextStyle(fontSize: 10, color: c.textMuted)),
+            const SizedBox(width: 12),
+            Container(width: 10, height: 2, color: c.textMuted),
+            Text(' Invested',
+                style: TextStyle(fontSize: 10, color: c.textMuted)),
+          ]),
           const SizedBox(height: 12),
           SizedBox(
             height: 120,
@@ -298,7 +312,15 @@ class _PortfolioHistoryChart extends StatelessWidget {
                 lineTouchData: LineTouchData(enabled: false),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: spots,
+                    spots: investedSpots,
+                    isCurved: true,
+                    color: c.textMuted,
+                    barWidth: 1.5,
+                    dashArray: const [4, 3],
+                    dotData: FlDotData(show: false),
+                  ),
+                  LineChartBarData(
+                    spots: valueSpots,
                     isCurved: true,
                     color: color,
                     barWidth: 2,
@@ -388,6 +410,20 @@ class _KpiCard extends StatelessWidget {
 
 // ── Allocation donut ──────────────────────────────────────────────────────────
 
+enum _AllocMode { type, asset, sector }
+
+const _allocPalette = [
+  Color(0xFF6366F1), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFF97316),
+  Color(0xFFEF4444), Color(0xFF06B6D4), Color(0xFFA855F7), Color(0xFF84CC16),
+];
+
+class _AllocSlice {
+  final String label;
+  final double value;
+  final Color color;
+  const _AllocSlice(this.label, this.value, this.color);
+}
+
 class _AllocationSection extends StatefulWidget {
   final List<PortfolioHolding> holdings;
   const _AllocationSection({required this.holdings});
@@ -398,21 +434,49 @@ class _AllocationSection extends StatefulWidget {
 
 class _AllocationSectionState extends State<_AllocationSection> {
   int _touchedIndex = -1;
+  _AllocMode _mode = _AllocMode.type;
+
+  List<_AllocSlice> _slices() {
+    final map = <String, double>{};
+    for (final h in widget.holdings) {
+      final key = switch (_mode) {
+        _AllocMode.type => h.assetType,
+        _AllocMode.asset => h.symbol.toUpperCase(),
+        _AllocMode.sector =>
+          h.sector ?? (h.assetType == 'crypto' ? 'Crypto' : 'Other'),
+      };
+      map[key] = (map[key] ?? 0) + h.currentValue;
+    }
+
+    if (_mode == _AllocMode.type) {
+      return _typeOrder
+          .where(map.containsKey)
+          .map((t) => _AllocSlice(
+              _typeLabels[t] ?? t, map[t]!, _typeColors[t] ?? AppColors.emerald))
+          .toList();
+    }
+
+    // asset / sector: sort desc, keep top 7, fold the rest into "Others".
+    final sorted = map.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.take(7).toList();
+    final restTotal = sorted.skip(7).fold(0.0, (s, e) => s + e.value);
+    final slices = <_AllocSlice>[
+      for (var i = 0; i < top.length; i++)
+        _AllocSlice(
+            top[i].key, top[i].value, _allocPalette[i % _allocPalette.length]),
+    ];
+    if (restTotal > 0) {
+      slices.add(_AllocSlice('Others', restTotal, context.colors.textMuted));
+    }
+    return slices;
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Aggregate value by type
-    final map = <String, double>{};
-    for (final h in widget.holdings) {
-      map[h.assetType] = (map[h.assetType] ?? 0) + h.currentValue;
-    }
-    final total = map.values.fold(0.0, (s, v) => s + v);
+    final slices = _slices();
+    final total = slices.fold(0.0, (s, e) => s + e.value);
     if (total == 0) return const SizedBox.shrink();
-
-    final entries = _typeOrder
-        .where((t) => map.containsKey(t))
-        .map((t) => MapEntry(t, map[t]!))
-        .toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -424,11 +488,23 @@ class _AllocationSectionState extends State<_AllocationSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Allocation',
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: context.colors.textPrimary)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Allocation',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.textPrimary)),
+              _AllocToggle(
+                mode: _mode,
+                onChanged: (m) => setState(() {
+                  _mode = m;
+                  _touchedIndex = -1;
+                }),
+              ),
+            ],
+          ),
           SizedBox(height: 20),
           Row(
             children: [
@@ -449,16 +525,15 @@ class _AllocationSectionState extends State<_AllocationSection> {
                   ),
                   sectionsSpace: 2,
                   centerSpaceRadius: 46,
-                  sections: entries.asMap().entries.map((e) {
+                  sections: slices.asMap().entries.map((e) {
                     final i = e.key;
-                    final type = e.value.key;
-                    final value = e.value.value;
-                    final pct = value / total * 100;
+                    final s = e.value;
+                    final pct = s.value / total * 100;
                     final isTouched = i == _touchedIndex;
                     return PieChartSectionData(
-                      color: _typeColors[type] ?? AppColors.emerald,
-                      value: value,
-                      title: '${pct.toStringAsFixed(0)}%',
+                      color: s.color,
+                      value: s.value,
+                      title: pct >= 6 ? '${pct.toStringAsFixed(0)}%' : '',
                       radius: isTouched ? 58 : 50,
                       titleStyle: TextStyle(
                         fontSize: isTouched ? 11 : 10,
@@ -473,22 +548,22 @@ class _AllocationSectionState extends State<_AllocationSection> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: entries.map((e) {
-                    final pct = e.value / total * 100;
-                    final color = _typeColors[e.key] ?? AppColors.emerald;
+                  children: slices.map((s) {
+                    final pct = s.value / total * 100;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: 9),
                       child: Row(children: [
                         Container(
                           width: 10, height: 10,
                           decoration: BoxDecoration(
-                            color: color,
+                            color: s.color,
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                         SizedBox(width: 8),
                         Expanded(
-                          child: Text(_typeLabels[e.key] ?? e.key,
+                          child: Text(s.label,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   fontSize: 12,
                                   color: context.colors.textSecond)),
@@ -507,6 +582,48 @@ class _AllocationSectionState extends State<_AllocationSection> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AllocToggle extends StatelessWidget {
+  final _AllocMode mode;
+  final ValueChanged<_AllocMode> onChanged;
+  const _AllocToggle({required this.mode, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    Widget chip(_AllocMode m, String label) {
+      final sel = m == mode;
+      return GestureDetector(
+        onTap: () => onChanged(m),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: sel ? AppColors.emerald : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: sel ? Colors.white : c.textMuted)),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: c.surfaceAlt,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        chip(_AllocMode.type, 'Type'),
+        chip(_AllocMode.asset, 'Asset'),
+        chip(_AllocMode.sector, 'Sector'),
+      ]),
     );
   }
 }
@@ -533,6 +650,8 @@ class _AtivosTab extends ConsumerWidget {
           final items = holdings.where((h) => h.assetType == type).toList();
           if (items.isNotEmpty) grouped[type] = items;
         }
+        final totalValue =
+            holdings.fold(0.0, (s, h) => s + h.currentValue);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -540,7 +659,8 @@ class _AtivosTab extends ConsumerWidget {
             return [
               _TypeHeader(type: entry.key, holdings: entry.value),
               SizedBox(height: 8),
-              ...entry.value.map((h) => _HoldingTile(holding: h)),
+              ...entry.value.map(
+                  (h) => _HoldingTile(holding: h, portfolioValue: totalValue)),
               SizedBox(height: 12),
             ];
           }).toList(),
@@ -610,7 +730,8 @@ class _TypeHeader extends StatelessWidget {
 
 class _HoldingTile extends StatelessWidget {
   final PortfolioHolding holding;
-  const _HoldingTile({required this.holding});
+  final double portfolioValue;
+  const _HoldingTile({required this.holding, this.portfolioValue = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -618,6 +739,9 @@ class _HoldingTile extends StatelessWidget {
     final isCrypto = h.assetType == 'crypto';
     final isPositive = h.gainLoss >= 0;
     final nf = NumberFormat('0.########');
+    final weight =
+        portfolioValue > 0 ? h.currentValue / portfolioValue * 100 : null;
+    final dayPct = h.dayChangePct;
 
     return InkWell(
       onTap: () {
@@ -682,11 +806,32 @@ class _HoldingTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(h.symbol,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: context.colors.textPrimary)),
+                Row(children: [
+                  Flexible(
+                    child: Text(h.symbol,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: context.colors.textPrimary)),
+                  ),
+                  if (weight != null) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: context.colors.surfaceAlt,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('${weight.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: context.colors.textSecond)),
+                    ),
+                  ],
+                ]),
                 SizedBox(height: 2),
                 Text(
                   '${nf.format(h.netShares)} · PM \$${h.avgPrice.toStringAsFixed(2)}',
@@ -721,6 +866,15 @@ class _HoldingTile extends StatelessWidget {
                     color: isPositive ? AppColors.emerald : AppColors.red),
               ),
             ]),
+            if (dayPct != null) ...[
+              const SizedBox(height: 1),
+              Text(
+                'Today ${dayPct >= 0 ? '+' : ''}${dayPct.toStringAsFixed(2)}%',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: dayPct >= 0 ? AppColors.emerald : AppColors.red),
+              ),
+            ],
           ]),
         ]),
       ),
@@ -820,6 +974,9 @@ class _DividendosTab extends ConsumerWidget {
         final avgYield = payers.isEmpty
             ? 0.0
             : payers.fold(0.0, (s, d) => s + d.yieldPct) / payers.length;
+        final avgYoC = payers.isEmpty
+            ? 0.0
+            : payers.fold(0.0, (s, d) => s + d.yieldOnCostPct) / payers.length;
 
         // Próximo ex-date
         final withDate = payers
@@ -848,13 +1005,24 @@ class _DividendosTab extends ConsumerWidget {
               ),
             ]),
             SizedBox(height: 12),
-            if (nextExDate != null)
+            Row(children: [
               _KpiCard(
-                label: 'Next ex-dividend',
-                value: _fmtDate(nextExDate),
-                icon: Icons.event_rounded,
-                color: const Color(0xFFF59E0B),
+                label: 'Yield on Cost',
+                value: '${avgYoC.toStringAsFixed(2)}%',
+                icon: Icons.savings_outlined,
+                color: AppColors.emerald,
               ),
+              SizedBox(width: 12),
+              if (nextExDate != null)
+                _KpiCard(
+                  label: 'Next ex-dividend',
+                  value: _fmtDate(nextExDate),
+                  icon: Icons.event_rounded,
+                  color: const Color(0xFFF59E0B),
+                )
+              else
+                const Expanded(child: SizedBox()),
+            ]),
             SizedBox(height: 24),
 
             // Dividend payers
@@ -983,7 +1151,7 @@ class _DividendTile extends StatelessWidget {
                   color: AppColors.emerald)),
           SizedBox(height: 2),
           Text(
-            '\$${(info.dividendRate ?? 0).toStringAsFixed(4)}/share · ${info.yieldPct.toStringAsFixed(2)}%',
+            'Yield ${info.yieldPct.toStringAsFixed(2)}% · YoC ${info.yieldOnCostPct.toStringAsFixed(2)}%',
             style: TextStyle(fontSize: 10, color: context.colors.textMuted),
           ),
         ]),

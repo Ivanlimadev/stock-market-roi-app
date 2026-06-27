@@ -46,6 +46,8 @@ class PortfolioHolding {
   final double totalCost;
   final String? firstPurchaseDate;
   final double? currentPrice;
+  final double? dayChangePct; // today's price change %, when available
+  final String? sector;       // GICS sector, when available
 
   const PortfolioHolding({
     required this.symbol,
@@ -55,6 +57,8 @@ class PortfolioHolding {
     required this.totalCost,
     this.firstPurchaseDate,
     this.currentPrice,
+    this.dayChangePct,
+    this.sector,
   });
 
   factory PortfolioHolding.fromJson(Map<String, dynamic> j) => PortfolioHolding(
@@ -66,7 +70,9 @@ class PortfolioHolding {
         firstPurchaseDate: j['first_purchase_date'] as String?,
       );
 
-  PortfolioHolding withPrice(double price) => PortfolioHolding(
+  PortfolioHolding withPrice(double price,
+          {double? dayChangePct, String? sector}) =>
+      PortfolioHolding(
         symbol: symbol,
         assetType: assetType,
         netShares: netShares,
@@ -74,6 +80,8 @@ class PortfolioHolding {
         totalCost: totalCost,
         firstPurchaseDate: firstPurchaseDate,
         currentPrice: price,
+        dayChangePct: dayChangePct ?? this.dayChangePct,
+        sector: sector ?? this.sector,
       );
 
   double get effectivePrice => currentPrice ?? avgPrice;
@@ -82,6 +90,13 @@ class PortfolioHolding {
   double get gainLoss => currentValue - costBasis;
   double get gainLossPct => costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
   bool get hasLivePrice => currentPrice != null;
+
+  /// The position's dollar move today, derived from [dayChangePct].
+  double? get dayChangeValue {
+    final p = dayChangePct;
+    if (p == null || p <= -100) return null;
+    return currentValue * (p / 100) / (1 + p / 100);
+  }
 }
 
 class DividendInfo {
@@ -93,6 +108,7 @@ class DividendInfo {
   final String? exDividendDate;
   final String? dividendDate;
   final double? payoutRatio;
+  final double? costPerShare; // your average price — for yield-on-cost
 
   const DividendInfo({
     required this.symbol,
@@ -103,11 +119,18 @@ class DividendInfo {
     this.exDividendDate,
     this.dividendDate,
     this.payoutRatio,
+    this.costPerShare,
   });
 
   bool get paysDividends => (dividendRate ?? 0) > 0;
   double get annualTotal => (dividendRate ?? 0) * netShares;
   double get yieldPct => (dividendYield ?? 0) * 100;
+
+  /// Yield on cost: annual dividend per share over *your* average price.
+  double get yieldOnCostPct =>
+      (dividendRate ?? 0) > 0 && (costPerShare ?? 0) > 0
+          ? (dividendRate! / costPerShare!) * 100
+          : 0;
 }
 
 class PortfolioSnapshot {
