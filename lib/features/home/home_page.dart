@@ -527,6 +527,7 @@ class _WelcomeHeader extends ConsumerWidget {
       orElse: () => null,
     );
     final fmt = NumberFormat.simpleCurrency(locale: 'en_US');
+    final hide = ref.watch(hideBalancesProvider);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
@@ -557,12 +558,31 @@ class _WelcomeHeader extends ConsumerWidget {
               Text('Portfolio balance',
                   style: TextStyle(fontSize: 11, color: c.textMuted)),
               const SizedBox(height: 2),
-              Text(
-                total == null ? '—' : fmt.format(total),
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.emerald),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Street mode: toggle balance visibility right next to it.
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => ref
+                        .read(hideBalancesProvider.notifier)
+                        .state = !hide,
+                    child: Icon(
+                        hide
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        size: 16,
+                        color: c.textMuted),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    total == null ? '—' : (hide ? '••••' : fmt.format(total)),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.emerald),
+                  ),
+                ],
               ),
             ],
           ),
