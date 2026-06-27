@@ -63,7 +63,7 @@ class CommentsService {
     final rows = await _c
         .from('comments')
         .select(
-            'id,user_id,body,like_count,edited,created_at,parent_id,hidden,author:profiles(display_name,avatar_url)')
+            'id,user_id,body,like_count,edited,created_at,parent_id,hidden,author:profiles!comments_user_id_fkey(display_name,avatar_url)')
         .eq('entity_type', t.type)
         .eq('entity_id', t.id)
         .order('created_at', ascending: true);
