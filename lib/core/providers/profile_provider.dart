@@ -6,13 +6,20 @@ class UserProfile {
   final String id;
   final String? displayName;
   final String? avatarUrl;
+  final bool isAdmin;
 
-  const UserProfile({required this.id, this.displayName, this.avatarUrl});
+  const UserProfile({
+    required this.id,
+    this.displayName,
+    this.avatarUrl,
+    this.isAdmin = false,
+  });
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
         id: j['id'] as String,
         displayName: j['display_name'] as String?,
         avatarUrl: j['avatar_url'] as String?,
+        isAdmin: j['is_admin'] as bool? ?? false,
       );
 }
 

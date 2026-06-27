@@ -17,6 +17,7 @@ class Comment {
   final String? authorName;
   final String? authorAvatar;
   final bool likedByMe;
+  final bool hidden;
 
   const Comment({
     required this.id,
@@ -29,6 +30,7 @@ class Comment {
     required this.authorName,
     required this.authorAvatar,
     required this.likedByMe,
+    required this.hidden,
   });
 
   factory Comment.fromJson(Map<String, dynamic> j, {required bool likedByMe}) {
@@ -44,6 +46,7 @@ class Comment {
       authorName: author?['display_name'] as String?,
       authorAvatar: author?['avatar_url'] as String?,
       likedByMe: likedByMe,
+      hidden: j['hidden'] as bool? ?? false,
     );
   }
 
@@ -60,7 +63,7 @@ class CommentsService {
     final rows = await _c
         .from('comments')
         .select(
-            'id,user_id,body,like_count,edited,created_at,parent_id,author:profiles(display_name,avatar_url)')
+            'id,user_id,body,like_count,edited,created_at,parent_id,hidden,author:profiles(display_name,avatar_url)')
         .eq('entity_type', t.type)
         .eq('entity_id', t.id)
         .order('created_at', ascending: true);
@@ -126,6 +129,28 @@ class CommentsService {
           .insert({'comment_id': commentId, 'user_id': uid});
     }
   }
+
+  // ── Moderation ─────────────────────────────────────────────────────────
+
+  /// Flags a comment for review. Auto-hides once it crosses the report
+  /// threshold (handled server-side). Idempotent per user (PK on the pair).
+  static Future<void> report(String commentId, {String? reason}) async {
+    final uid = _c.auth.currentUser?.id;
+    if (uid == null) return;
+    await _c.from('comment_reports').upsert({
+      'comment_id': commentId,
+      'reporter_id': uid,
+      'reason': reason,
+    });
+  }
+
+  /// Admin only (enforced by RLS): hide or restore a comment.
+  static Future<void> setHidden(String commentId, bool hidden) =>
+      _c.from('comments').update({'hidden': hidden}).eq('id', commentId);
+
+  /// Admin only (enforced by RLS): ban a user from posting.
+  static Future<void> banUser(String userId, {String? reason}) =>
+      _c.from('banned_users').upsert({'user_id': userId, 'reason': reason});
 }
 
 /// All comments for a target (flat list; the UI groups replies under parents).

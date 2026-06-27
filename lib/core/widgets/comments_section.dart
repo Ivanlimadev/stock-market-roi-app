@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/comments_provider.dart';
+import '../providers/profile_provider.dart';
 import '../theme/app_theme.dart';
 
 /// Shared discussion area for blog posts and asset pages (app + site parity).
@@ -63,6 +64,77 @@ class _CommentsSectionState extends ConsumerState<CommentsSection> {
       await CommentsService.toggleLike(c.id, c.likedByMe);
       await _refresh();
     } catch (_) {/* ignore — next refresh corrects state */}
+  }
+
+  Future<void> _report(Comment c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.colors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Report comment', style: TextStyle(fontSize: 16)),
+        content: const Text(
+            'Report this comment for review? It will be hidden automatically '
+            'if multiple people report it.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel',
+                  style: TextStyle(color: context.colors.textMuted))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.orange,
+                foregroundColor: Colors.white),
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await CommentsService.report(c.id);
+    await _refresh();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thanks — reported for review.')));
+    }
+  }
+
+  Future<void> _setHidden(Comment c, bool hidden) async {
+    await CommentsService.setHidden(c.id, hidden);
+    await _refresh();
+  }
+
+  Future<void> _ban(Comment c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.colors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Ban user', style: TextStyle(fontSize: 16)),
+        content: Text(
+            'Ban ${c.authorName ?? 'this user'} from posting? Their existing '
+            'comments stay unless you hide them.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel',
+                  style: TextStyle(color: context.colors.textMuted))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.red, foregroundColor: Colors.white),
+            child: const Text('Ban'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await CommentsService.banUser(c.userId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User banned.')));
+    }
   }
 
   Future<void> _edit(Comment c) async {
@@ -146,6 +218,7 @@ class _CommentsSectionState extends ConsumerState<CommentsSection> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final async = ref.watch(commentsProvider(widget.target));
+    final isAdmin = ref.watch(profileProvider).valueOrNull?.isAdmin ?? false;
 
     return Container(
       margin: const EdgeInsets.only(top: 28),
@@ -190,7 +263,7 @@ class _CommentsSectionState extends ConsumerState<CommentsSection> {
               child: Text('Could not load comments.',
                   style: TextStyle(fontSize: 13, color: c.textMuted)),
             ),
-            data: (all) => _list(c, all),
+            data: (all) => _list(c, all, isAdmin),
           ),
         ],
       ),
@@ -298,7 +371,7 @@ class _CommentsSectionState extends ConsumerState<CommentsSection> {
 
   // ── List ─────────────────────────────────────────────────────────────────
 
-  Widget _list(AppThemeColors c, List<Comment> all) {
+  Widget _list(AppThemeColors c, List<Comment> all, bool isAdmin) {
     final tops = all.where((x) => x.parentId == null).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final repliesByParent = <String, List<Comment>>{};
@@ -316,30 +389,29 @@ class _CommentsSectionState extends ConsumerState<CommentsSection> {
       );
     }
 
+    _CommentTile tile(Comment x, VoidCallback onReply) => _CommentTile(
+          comment: x,
+          loggedIn: _loggedIn,
+          isAdmin: isAdmin,
+          onLike: () => _toggleLike(x),
+          onReply: onReply,
+          onReport: () => _report(x),
+          onEdit: x.isMine ? () => _edit(x) : null,
+          onDelete: x.isMine ? () => _delete(x) : null,
+          onHide: isAdmin ? () => _setHidden(x, !x.hidden) : null,
+          onBan: (isAdmin && !x.isMine) ? () => _ban(x) : null,
+        );
+
     return Column(
       children: [
         for (final top in tops) ...[
           const SizedBox(height: 14),
-          _CommentTile(
-            comment: top,
-            onLike: () => _toggleLike(top),
-            onReply: () => setState(() {
-              _replyingTo = top;
-            }),
-            onEdit: top.isMine ? () => _edit(top) : null,
-            onDelete: top.isMine ? () => _delete(top) : null,
-          ),
+          tile(top, () => setState(() => _replyingTo = top)),
           for (final reply in (repliesByParent[top.id] ?? [])
             ..sort((a, b) => a.createdAt.compareTo(b.createdAt)))
             Padding(
               padding: const EdgeInsets.only(left: 40, top: 12),
-              child: _CommentTile(
-                comment: reply,
-                onLike: () => _toggleLike(reply),
-                onReply: () => setState(() => _replyingTo = top),
-                onEdit: reply.isMine ? () => _edit(reply) : null,
-                onDelete: reply.isMine ? () => _delete(reply) : null,
-              ),
+              child: tile(reply, () => setState(() => _replyingTo = top)),
             ),
         ],
       ],
@@ -351,17 +423,27 @@ class _CommentsSectionState extends ConsumerState<CommentsSection> {
 
 class _CommentTile extends StatelessWidget {
   final Comment comment;
+  final bool loggedIn;
+  final bool isAdmin;
   final VoidCallback onLike;
   final VoidCallback onReply;
+  final VoidCallback onReport;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onHide;
+  final VoidCallback? onBan;
 
   const _CommentTile({
     required this.comment,
+    required this.loggedIn,
+    required this.isAdmin,
     required this.onLike,
     required this.onReply,
+    required this.onReport,
     this.onEdit,
     this.onDelete,
+    this.onHide,
+    this.onBan,
   });
 
   String _ago(DateTime dt) {
@@ -420,8 +502,33 @@ class _CommentTile extends StatelessWidget {
                   Text('· edited',
                       style: TextStyle(fontSize: 11, color: c.textMuted)),
                 ],
-                if (onEdit != null || onDelete != null)
-                  _OwnerMenu(onEdit: onEdit, onDelete: onDelete),
+                if (comment.hidden) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text('Hidden',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.orange)),
+                  ),
+                ],
+                if (onEdit != null ||
+                    onDelete != null ||
+                    onHide != null ||
+                    onBan != null)
+                  _CommentMenu(
+                    hidden: comment.hidden,
+                    onEdit: onEdit,
+                    onDelete: onDelete,
+                    onHide: onHide,
+                    onBan: onBan,
+                  ),
               ]),
               const SizedBox(height: 3),
               Text(comment.body,
@@ -457,6 +564,17 @@ class _CommentTile extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: c.textMuted)),
                 ),
+                if (loggedIn && !comment.isMine) ...[
+                  const SizedBox(width: 18),
+                  GestureDetector(
+                    onTap: onReport,
+                    child: Text('Report',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: c.textMuted)),
+                  ),
+                ],
               ]),
             ],
           ),
@@ -466,10 +584,19 @@ class _CommentTile extends StatelessWidget {
   }
 }
 
-class _OwnerMenu extends StatelessWidget {
+class _CommentMenu extends StatelessWidget {
+  final bool hidden;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  const _OwnerMenu({this.onEdit, this.onDelete});
+  final VoidCallback? onHide;
+  final VoidCallback? onBan;
+  const _CommentMenu({
+    required this.hidden,
+    this.onEdit,
+    this.onDelete,
+    this.onHide,
+    this.onBan,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -481,15 +608,28 @@ class _OwnerMenu extends StatelessWidget {
         iconSize: 16,
         icon: Icon(Icons.more_horiz_rounded, color: c.textMuted),
         color: c.surface,
-        onSelected: (v) => v == 0 ? onEdit?.call() : onDelete?.call(),
+        onSelected: (v) {
+          if (v == 0) onEdit?.call();
+          if (v == 1) onDelete?.call();
+          if (v == 2) onHide?.call();
+          if (v == 3) onBan?.call();
+        },
         itemBuilder: (_) => [
           if (onEdit != null)
             const PopupMenuItem(value: 0, child: Text('Edit')),
           if (onDelete != null)
             PopupMenuItem(
                 value: 1,
-                child: Text('Delete',
-                    style: TextStyle(color: AppColors.red))),
+                child:
+                    Text('Delete', style: TextStyle(color: AppColors.red))),
+          if (onHide != null)
+            PopupMenuItem(
+                value: 2, child: Text(hidden ? 'Unhide' : 'Hide')),
+          if (onBan != null)
+            PopupMenuItem(
+                value: 3,
+                child:
+                    Text('Ban user', style: TextStyle(color: AppColors.red))),
         ],
       ),
     );
