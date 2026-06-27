@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
+import '../../core/widgets/skeleton.dart';
 import '../portfolio/add_transaction_sheet.dart';
 
 final _searchProvider = StateProvider<String>((ref) => '');
@@ -41,7 +42,7 @@ class StocksPage extends ConsumerWidget {
 
           Expanded(
             child: stocks.when(
-              loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
+              loading: () => const StockListSkeleton(),
               error:   (e, _) => Center(
                 child: Text('Failed to load stocks', style: TextStyle(color: context.colors.textMuted))),
               data: (all) {

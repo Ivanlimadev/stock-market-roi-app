@@ -7,8 +7,10 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/api/api_client.dart';
-import '../../core/providers/portfolio_provider.dart';
+import '../../core/models/market_model.dart';
+import '../../core/providers/portfolio_provider.dart' hide StockQuote;
 import '../../core/providers/realtime_price_provider.dart';
+import '../../core/providers/screener_provider.dart';
 
 Future<void> showAddTransactionSheet(BuildContext context, {String? initialSymbol}) {
   return showModalBottomSheet(
@@ -51,11 +53,20 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
   String? _autoFilledPrice; // last value we auto-filled (to detect manual edits)
   Timer? _priceDebounce;
 
+  // Symbol autocomplete: the symbol the user explicitly picked (or that exactly
+  // matched the known universe) + its resolved name. While [_selectedSymbol] is
+  // null with a non-empty query we show ranked suggestions instead.
+  String? _selectedSymbol;
+  String? _resolvedName;
+
   @override
   void initState() {
     super.initState();
     final sym = widget.initialSymbol?.trim();
-    if (sym != null && sym.isNotEmpty) _prefillPrice(sym.toUpperCase());
+    if (sym != null && sym.isNotEmpty) {
+      _selectedSymbol = sym.toUpperCase(); // opened from an asset → pre-confirmed
+      _prefillPrice(sym.toUpperCase());
+    }
   }
 
   @override
@@ -110,9 +121,33 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
   void _onSymbolChanged(String value) {
     _priceDebounce?.cancel();
     final sym = value.trim().toUpperCase();
-    if (sym.isEmpty) return;
-    _priceDebounce = Timer(const Duration(milliseconds: 600),
-        () => _prefillPrice(sym));
+    if (sym.isEmpty) {
+      setState(() {
+        _selectedSymbol = null;
+        _resolvedName = null;
+      });
+      return;
+    }
+    // Exact match against the known universe → auto-confirm (no tap needed).
+    if (_assetType == 'crypto') {
+      if (kCryptoTickerToCoinId.containsKey(sym)) {
+        _confirmCrypto(sym, setText: false, unfocus: false);
+        return;
+      }
+    } else {
+      final all = ref.read(screenerProvider).valueOrNull ?? const <StockQuote>[];
+      for (final s in all) {
+        if (s.symbol.toUpperCase() == sym) {
+          _confirmStock(s, setText: false, unfocus: false);
+          return;
+        }
+      }
+    }
+    // No exact match yet — clear any prior selection so suggestions show.
+    setState(() {
+      _selectedSymbol = null;
+      _resolvedName = null;
+    });
   }
 
   double get _total {
@@ -292,6 +327,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                     ),
                   ],
                 ),
+                _buildSymbolArea(),
                 SizedBox(height: 12),
 
                 // Price + Date
@@ -446,6 +482,256 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
           fontWeight: FontWeight.w600,
           color: context.colors.textMuted,
           letterSpacing: 0.6));
+
+  /// Symbol area under the field: a ranked suggestions dropdown while typing,
+  /// or a compact confirmation (logo + name + check) once a ticker is chosen.
+  Widget _buildSymbolArea() {
+    final query = _symbolCtrl.text.trim();
+    if (query.isEmpty) return const SizedBox.shrink();
+
+    final screener =
+        ref.watch(screenerProvider).valueOrNull ?? const <StockQuote>[];
+
+    // A ticker was chosen / exact-matched → confirm it.
+    if (_selectedSymbol != null) {
+      final name = _resolvedName ?? _nameFor(_selectedSymbol!, screener);
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          children: [
+            _symbolLogo(_selectedSymbol!, 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.textPrimary)),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.check_circle_rounded,
+                size: 18, color: AppColors.emerald),
+          ],
+        ),
+      );
+    }
+
+    // Still typing → ranked suggestions to pick from.
+    final tiles = <Widget>[];
+    if (_assetType == 'crypto') {
+      for (final sym in _cryptoSuggestions(query)) {
+        tiles.add(_suggestionTile(
+          symbol: sym,
+          title: sym,
+          subtitle: 'Crypto',
+          onTap: () => _confirmCrypto(sym),
+        ));
+      }
+    } else {
+      for (final q in _stockSuggestions(screener, query)) {
+        tiles.add(_suggestionTile(
+          symbol: q.symbol,
+          title: q.symbol,
+          subtitle: q.name,
+          price: q.price,
+          onTap: () => _confirmStock(q, setText: true, unfocus: true),
+        ));
+      }
+    }
+
+    if (tiles.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 248),
+        decoration: BoxDecoration(
+          color: context.colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: context.colors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          children: tiles,
+        ),
+      ),
+    );
+  }
+
+  Widget _suggestionTile({
+    required String symbol,
+    required String title,
+    required String subtitle,
+    double? price,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            _symbolLogo(symbol.toUpperCase(), 28),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: context.colors.textPrimary)),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12, color: context.colors.textMuted)),
+                ],
+              ),
+            ),
+            if (price != null && price > 0) ...[
+              const SizedBox(width: 8),
+              Text('\$${price.toStringAsFixed(2)}',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.textSecond)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Company/asset name for a symbol, falling back to the symbol itself.
+  String _nameFor(String symbol, List<StockQuote> all) {
+    for (final s in all) {
+      if (s.symbol.toUpperCase() == symbol) return s.name;
+    }
+    return symbol;
+  }
+
+  /// Ranked stock matches: exact symbol → symbol prefix → name-word prefix →
+  /// contains; ties broken by market cap (so the principais surface first).
+  List<StockQuote> _stockSuggestions(List<StockQuote> all, String q) {
+    final query = q.toUpperCase();
+    if (query.isEmpty) return const [];
+    final scored = <(int, StockQuote)>[];
+    for (final s in all) {
+      final sym = s.symbol.toUpperCase();
+      final name = s.name.toUpperCase();
+      int score;
+      if (sym == query) {
+        score = 0;
+      } else if (sym.startsWith(query)) {
+        score = 1;
+      } else if (name.split(RegExp(r'\s+')).any((w) => w.startsWith(query))) {
+        score = 2;
+      } else if (sym.contains(query)) {
+        score = 3;
+      } else if (name.contains(query)) {
+        score = 4;
+      } else {
+        continue;
+      }
+      scored.add((score, s));
+    }
+    scored.sort((a, b) {
+      if (a.$1 != b.$1) return a.$1.compareTo(b.$1);
+      return (b.$2.marketCap ?? 0).compareTo(a.$2.marketCap ?? 0);
+    });
+    return scored.take(7).map((e) => e.$2).toList();
+  }
+
+  List<String> _cryptoSuggestions(String q) {
+    final query = q.toUpperCase();
+    if (query.isEmpty) return const [];
+    final syms = kCryptoTickerToCoinId.keys
+        .where((k) => k.toUpperCase().contains(query))
+        .toList();
+    syms.sort((a, b) {
+      final ap = a.toUpperCase().startsWith(query) ? 0 : 1;
+      final bp = b.toUpperCase().startsWith(query) ? 0 : 1;
+      if (ap != bp) return ap.compareTo(bp);
+      return a.compareTo(b);
+    });
+    return syms.take(7).toList();
+  }
+
+  void _confirmStock(StockQuote q, {bool setText = false, bool unfocus = false}) {
+    setState(() {
+      if (setText) {
+        _symbolCtrl.text = q.symbol.toUpperCase();
+        _symbolCtrl.selection =
+            TextSelection.collapsed(offset: _symbolCtrl.text.length);
+      }
+      _selectedSymbol = q.symbol.toUpperCase();
+      _resolvedName = q.name;
+      _assetType = _assetTypeFor(q); // auto-set the chip from the asset's class
+      if (q.price > 0 && _priceUntouched) {
+        final text = q.price.toStringAsFixed(2);
+        _priceCtrl.text = text;
+        _autoFilledPrice = text;
+      }
+    });
+    if (unfocus) FocusScope.of(context).unfocus();
+  }
+
+  /// Classifies a screener asset into the sheet's chip types using the
+  /// backend's `sector`/`industry` (ETFs carry sector "ETFs"; REITs carry an
+  /// "REIT—…" industry). Everything else is a plain stock.
+  String _assetTypeFor(StockQuote q) {
+    final sector = (q.sector ?? '').toLowerCase();
+    final industry = (q.industry ?? '').toLowerCase();
+    if (sector == 'etfs' || sector == 'etf') return 'etf';
+    if (industry.contains('reit')) return 'reit';
+    return 'stock';
+  }
+
+  void _confirmCrypto(String sym, {bool setText = true, bool unfocus = true}) {
+    final s = sym.toUpperCase();
+    setState(() {
+      if (setText) {
+        _symbolCtrl.text = s;
+        _symbolCtrl.selection =
+            TextSelection.collapsed(offset: _symbolCtrl.text.length);
+      }
+      _selectedSymbol = s;
+      _resolvedName = s;
+    });
+    _prefillPrice(s);
+    if (unfocus) FocusScope.of(context).unfocus();
+  }
+
+  /// Small rounded asset logo (parqet), with a 2-letter monogram fallback.
+  Widget _symbolLogo(String symbol, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+          color: context.colors.surfaceAlt,
+          borderRadius: BorderRadius.circular(6)),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        'https://assets.parqet.com/logos/symbol/$symbol?format=png',
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Center(
+          child: Text(
+            symbol.length >= 2 ? symbol.substring(0, 2) : symbol,
+            style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: context.colors.textMuted),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _inputField({
     required TextEditingController controller,
