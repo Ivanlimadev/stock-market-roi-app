@@ -63,7 +63,7 @@ class BlogPostPage extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Erro ao carregar artigo')),
+        body: const Center(child: Text('Failed to load article')),
       ),
       data: (loaded) => _PostBody(post: loaded),
     );

@@ -132,7 +132,7 @@ class StockDetailPage extends ConsumerWidget {
                   foregroundColor: AppColors.emerald,
                   side: BorderSide(color: AppColors.emerald),
                 ),
-                child: Text('Tentar novamente'),
+                child: Text('Try again'),
               ),
             ],
           ),
@@ -486,11 +486,11 @@ class _AnalystCard extends StatelessWidget {
     if (r.contains('strong_buy') || r.contains('strongbuy'))
       return (label: 'Strong Buy', color: AppColors.emerald);
     if (r == 'buy')
-      return (label: 'Comprar', color: AppColors.emerald);
+      return (label: 'Buy', color: AppColors.emerald);
     if (r == 'hold' || r == 'neutral')
-      return (label: 'Neutro', color: const Color(0xFFF59E0B));
+      return (label: 'Neutral', color: const Color(0xFFF59E0B));
     if (r.contains('underperform') || r == 'sell')
-      return (label: 'Vender', color: AppColors.red);
+      return (label: 'Sell', color: AppColors.red);
     return (label: r, color: AppColors.textMuted);
   }
 
@@ -676,7 +676,7 @@ class _KeyStatsState extends State<_KeyStats> {
         ('Analyst Target',info.targetMeanPrice != null ? fmtStockPrice(info.targetMeanPrice!) : '—'),
       ].where((r) => r.$2 != '—').toList()),
       if ((info.dividendYield ?? 0) > 0)
-        ('Dividendos', [
+        ('Dividends', [
           ('Dividend Yield',  fmtPct(info.dividendYield)),
           ('Dividendo Anual', info.dividendRate != null ? '\$${fmtN(info.dividendRate)}' : '—'),
           ('Ex-Dividend',     info.exDividendDate ?? '—'),
@@ -779,7 +779,7 @@ class _DividendsCard extends StatelessWidget {
     final lastPay = dividends.isNotEmpty ? dividends.first.amount : null;
 
     return _Section(
-      title: 'Dividendos',
+      title: 'Dividends',
       child: Column(
         children: [
           if (info?.dividendYield != null || lastPay != null)
@@ -1158,7 +1158,7 @@ class _AboutState extends State<_About> {
   @override
   Widget build(BuildContext context) {
     return _Section(
-      title: 'Sobre',
+      title: 'About',
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
@@ -1861,7 +1861,7 @@ class _InvestmentSimulatorState extends ConsumerState<_InvestmentSimulator> {
               loading: () => Row(children: [
                 Expanded(child: _SimCard(label: 'Price', value: null, pct: null)),
                 SizedBox(width: 10),
-                Expanded(child: _SimCard(label: '+ Dividendos', value: null, pct: null)),
+                Expanded(child: _SimCard(label: '+ Dividends', value: null, pct: null)),
               ]),
               error: (_, __) => Text('Historical data unavailable',
                   style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
@@ -1879,7 +1879,7 @@ class _InvestmentSimulatorState extends ConsumerState<_InvestmentSimulator> {
                       pct: pctPrice)),
                   SizedBox(width: 10),
                   Expanded(child: _SimCard(
-                      label: '+ Dividendos',
+                      label: '+ Dividends',
                       value: result.withDiv,
                       pct: pctDiv,
                       highlight: result.withDiv != null)),

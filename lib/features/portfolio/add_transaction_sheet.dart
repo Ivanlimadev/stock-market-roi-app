@@ -178,14 +178,14 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
       navigator.pop();
       messenger.showSnackBar(SnackBar(
         content: Text(
-            '$symbol ${_operation == 'buy' ? 'comprado' : 'vendido'} — carteira atualizada'),
+            '$symbol ${_operation == 'buy' ? 'bought' : 'sold'} — portfolio updated'),
         backgroundColor: AppColors.emerald,
         duration: const Duration(seconds: 2),
       ));
     } catch (e) {
       if (mounted) setState(() => _loading = false);
       messenger.showSnackBar(SnackBar(
-        content: Text('Erro: $e'),
+        content: Text('Error: $e'),
         backgroundColor: AppColors.red,
       ));
     }
@@ -369,7 +369,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                 // Fees optional
                 _inputField(
                   controller: _feesCtrl,
-                  label: 'Taxas / Corretagem (opcional)',
+                  label: 'Fees / Commission (optional)',
                   hint: '0.00',
                   keyboard:
                       const TextInputType.numberWithOptions(decimal: true),
@@ -389,7 +389,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Total estimado',
+                      Text('Estimated total',
                           style: TextStyle(
                               fontSize: 13, color: context.colors.textMuted)),
                       Text(

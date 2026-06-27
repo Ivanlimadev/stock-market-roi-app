@@ -751,7 +751,7 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
             loading: () => _blogSkeleton(),
             error: (e, _) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text('Erro posts: $e',
+              child: Text('Error loading posts: $e',
                   style: TextStyle(fontSize: 11, color: AppColors.red)),
             ),
             data: (posts) {

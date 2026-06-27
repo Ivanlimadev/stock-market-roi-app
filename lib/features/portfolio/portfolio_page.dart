@@ -102,7 +102,7 @@ class _LoggedInPortfolioState extends ConsumerState<_LoggedInPortfolio>
           labelColor: AppColors.emerald,
           unselectedLabelColor: context.colors.textMuted,
           dividerColor: context.colors.surfaceAlt,
-          tabs: const [Tab(text: 'Resumo'), Tab(text: 'Dividendos'), Tab(text: 'Ativos')],
+          tabs: const [Tab(text: 'Overview'), Tab(text: 'Dividends'), Tab(text: 'Holdings')],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -218,7 +218,7 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
         SizedBox(height: 12),
         Row(children: [
           _KpiCard(
-            label: 'Ganho/Perda',
+            label: 'Gain/Loss',
             value: '${isPositive ? '+' : ''}${fmt.format(_totalGain)}',
             icon: isPositive
                 ? Icons.trending_up_rounded

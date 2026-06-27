@@ -169,55 +169,55 @@ class _MacroScorecard extends StatelessWidget {
   static _TileData _fedTile(MacroIndicator? ind) {
     if (ind == null) return const _TileData('FED', '—', '—', _Regime.neutral);
     final v = ind.value; final c = ind.change;
-    if (v > 4.5)  return _TileData('FED', 'Restritivo',      '${v.toStringAsFixed(2)}%', _Regime.negative);
-    if (c < -0.1) return _TileData('FED', 'Ciclo de Cortes', '${v.toStringAsFixed(2)}%', _Regime.caution);
-    if (v < 2.0)  return _TileData('FED', 'Acomodatício',    '${v.toStringAsFixed(2)}%', _Regime.positive);
-    return               _TileData('FED', 'Neutro',           '${v.toStringAsFixed(2)}%', _Regime.caution);
+    if (v > 4.5)  return _TileData('FED', 'Restrictive',      '${v.toStringAsFixed(2)}%', _Regime.negative);
+    if (c < -0.1) return _TileData('FED', 'Cutting Cycle', '${v.toStringAsFixed(2)}%', _Regime.caution);
+    if (v < 2.0)  return _TileData('FED', 'Accommodative',    '${v.toStringAsFixed(2)}%', _Regime.positive);
+    return               _TileData('FED', 'Neutral',           '${v.toStringAsFixed(2)}%', _Regime.caution);
   }
 
   static _TileData _growthTile(MacroIndicator? ind) {
     if (ind == null) return const _TileData('GDP', '—', '—', _Regime.neutral);
     final v = ind.value;
-    if (v >= 2.5) return _TileData('GDP', 'Expansão',      '${v.toStringAsFixed(1)}% YoY', _Regime.positive);
-    if (v >= 0)   return _TileData('GDP', 'Desaceleração', '${v.toStringAsFixed(1)}% YoY', _Regime.caution);
-    return               _TileData('GDP', 'Contração',     '${v.toStringAsFixed(1)}% YoY', _Regime.negative);
+    if (v >= 2.5) return _TileData('GDP', 'Expansion',      '${v.toStringAsFixed(1)}% YoY', _Regime.positive);
+    if (v >= 0)   return _TileData('GDP', 'Slowdown', '${v.toStringAsFixed(1)}% YoY', _Regime.caution);
+    return               _TileData('GDP', 'Contraction',     '${v.toStringAsFixed(1)}% YoY', _Regime.negative);
   }
 
   static _TileData _inflationTile(MacroIndicator? ind) {
     if (ind == null) return const _TileData('PCE', '—', '—', _Regime.neutral);
     final v = ind.value; final c = ind.change;
-    if (v > 3.5) { return _TileData('PCE', 'Elevada', '${v.toStringAsFixed(2)}%', _Regime.negative); }
+    if (v > 3.5) { return _TileData('PCE', 'Elevated', '${v.toStringAsFixed(2)}%', _Regime.negative); }
     if (v > 2.5) {
       return _TileData('PCE',
-        c <= 0 ? 'Em queda' : 'Acelerando', '${v.toStringAsFixed(2)}%',
+        c <= 0 ? 'Falling' : 'Accelerating', '${v.toStringAsFixed(2)}%',
         c <= 0 ? _Regime.caution : _Regime.negative);
     }
-    return _TileData('PCE', 'Controlada', '${v.toStringAsFixed(2)}%', _Regime.positive);
+    return _TileData('PCE', 'In check', '${v.toStringAsFixed(2)}%', _Regime.positive);
   }
 
   static _TileData _laborTile(MacroIndicator? ind) {
-    if (ind == null) return const _TileData('EMPREGO', '—', '—', _Regime.neutral);
+    if (ind == null) return const _TileData('JOBS', '—', '—', _Regime.neutral);
     final v = ind.value;
-    if (v < 4.0) return _TileData('EMPREGO', 'Aquecido',  '${v.toStringAsFixed(1)}%', _Regime.positive);
-    if (v < 5.0) return _TileData('EMPREGO', 'Esfriando', '${v.toStringAsFixed(1)}%', _Regime.caution);
-    return              _TileData('EMPREGO', 'Fraco',      '${v.toStringAsFixed(1)}%', _Regime.negative);
+    if (v < 4.0) return _TileData('JOBS', 'Hot',  '${v.toStringAsFixed(1)}%', _Regime.positive);
+    if (v < 5.0) return _TileData('JOBS', 'Cooling', '${v.toStringAsFixed(1)}%', _Regime.caution);
+    return              _TileData('JOBS', 'Weak',      '${v.toStringAsFixed(1)}%', _Regime.negative);
   }
 
   static _TileData _curveTile(MacroIndicator? ind) {
-    if (ind == null) return const _TileData('CURVA', '—', '—', _Regime.neutral);
+    if (ind == null) return const _TileData('CURVE', '—', '—', _Regime.neutral);
     final v = ind.value;
     final vs = '${v >= 0 ? '+' : ''}${v.toStringAsFixed(2)}%';
-    if (v < -0.25) return _TileData('CURVA', 'Invertida', vs, _Regime.negative);
-    if (v <  0.5)  return _TileData('CURVA', 'Flat',      vs, _Regime.caution);
-    return                _TileData('CURVA', 'Normal',     vs, _Regime.positive);
+    if (v < -0.25) return _TileData('CURVE', 'Inverted', vs, _Regime.negative);
+    if (v <  0.5)  return _TileData('CURVE', 'Flat',      vs, _Regime.caution);
+    return                _TileData('CURVE', 'Normal',     vs, _Regime.positive);
   }
 
   static _TileData _recessionTile(MacroIndicator? ind) {
-    if (ind == null) return const _TileData('RECESSÃO', '—', '—', _Regime.neutral);
+    if (ind == null) return const _TileData('RECESSION', '—', '—', _Regime.neutral);
     final v = ind.value;
-    if (v < 10) return _TileData('RECESSÃO', 'Baixo',   '${v.toStringAsFixed(0)}%', _Regime.positive);
-    if (v < 30) return _TileData('RECESSÃO', 'Elevado', '${v.toStringAsFixed(0)}%', _Regime.caution);
-    return             _TileData('RECESSÃO', 'Alto',     '${v.toStringAsFixed(0)}%', _Regime.negative);
+    if (v < 10) return _TileData('RECESSION', 'Low',   '${v.toStringAsFixed(0)}%', _Regime.positive);
+    if (v < 30) return _TileData('RECESSION', 'Elevated', '${v.toStringAsFixed(0)}%', _Regime.caution);
+    return             _TileData('RECESSION', 'High',     '${v.toStringAsFixed(0)}%', _Regime.negative);
   }
 }
 
@@ -278,12 +278,12 @@ class _FomcCalendar extends StatelessWidget {
 
   static final _meetings = <(DateTime, String)>[
     (DateTime(2026, 7,  29), '28–29 Jul 2026'),
-    (DateTime(2026, 9,  16), '15–16 Set 2026'),
-    (DateTime(2026, 10, 28), '27–28 Out 2026'),
-    (DateTime(2026, 12,  9), '8–9 Dez 2026'),
+    (DateTime(2026, 9,  16), '15–16 Sep 2026'),
+    (DateTime(2026, 10, 28), '27–28 Oct 2026'),
+    (DateTime(2026, 12,  9), '8–9 Dec 2026'),
     (DateTime(2027, 1,  27), '26–27 Jan 2027'),
     (DateTime(2027, 3,  17), '16–17 Mar 2027'),
-    (DateTime(2027, 4,  28), '27–28 Abr 2027'),
+    (DateTime(2027, 4,  28), '27–28 Apr 2027'),
     (DateTime(2027, 6,   9), '8–9 Jun 2027'),
   ];
 
@@ -317,7 +317,7 @@ class _FomcCalendar extends StatelessWidget {
         Row(children: [
           const Icon(Icons.event_rounded, size: 14, color: AppColors.emerald),
           const SizedBox(width: 6),
-          Text('CALENDÁRIO FOMC', style: TextStyle(
+          Text('FOMC CALENDAR', style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w800,
             letterSpacing: 1.1, color: context.colors.textMuted)),
           const Spacer(),
@@ -344,7 +344,7 @@ class _FomcCalendar extends StatelessWidget {
           ),
           child: Row(children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('PRÓXIMA REUNIÃO', style: TextStyle(
+              Text('NEXT MEETING', style: TextStyle(
                 fontSize: 9, fontWeight: FontWeight.w600,
                 letterSpacing: 0.6, color: context.colors.textMuted)),
               const SizedBox(height: 3),
@@ -356,7 +356,7 @@ class _FomcCalendar extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text('em', style: TextStyle(
                 fontSize: 9, color: context.colors.textMuted)),
-              Text('$daysLeft dias', style: const TextStyle(
+              Text('$daysLeft days', style: const TextStyle(
                 fontSize: 20, fontWeight: FontWeight.w900,
                 color: AppColors.emerald)),
             ]),
@@ -378,7 +378,7 @@ class _FomcCalendar extends StatelessWidget {
               Text(m.$2, style: TextStyle(
                 fontSize: 12, color: context.colors.textSecond)),
               const Spacer(),
-              Text('em $d dias', style: TextStyle(
+              Text('in $d days', style: TextStyle(
                 fontSize: 10, color: context.colors.textMuted)),
             ]),
           );
@@ -402,7 +402,7 @@ class _FomcOutdated extends StatelessWidget {
       const Icon(Icons.event_busy_rounded, size: 16, color: AppColors.emerald),
       const SizedBox(width: 10),
       Expanded(child: Text(
-        'Calendário FOMC será atualizado com as próximas datas.',
+        'The FOMC calendar will be updated with upcoming dates.',
         style: TextStyle(fontSize: 12, color: context.colors.textMuted))),
     ]),
   );
@@ -434,8 +434,8 @@ class _FullIndicatorCard extends ConsumerStatefulWidget {
 }
 
 class _FullIndicatorCardState extends ConsumerState<_FullIndicatorCard> {
-  String _range = '5A';
-  static const _ranges = ['1A', '2A', '5A', '10A', 'Máx'];
+  String _range = '5Y';
+  static const _ranges = ['1Y', '2Y', '5Y', '10Y', 'Max'];
 
   @override
   Widget build(BuildContext context) {
@@ -527,7 +527,7 @@ class _DetailContent extends StatelessWidget {
       const SizedBox(height: 14),
       _StatsRow(detail: detail),
       const Divider(height: 28),
-      Text('Sobre este indicador', style: TextStyle(
+      Text('About this indicator', style: TextStyle(
         fontSize: 11, fontWeight: FontWeight.w700,
         letterSpacing: 0.5, color: context.colors.textMuted)),
       const SizedBox(height: 6),
@@ -719,16 +719,16 @@ class _StatsRow extends StatelessWidget {
     }
 
     return Row(children: [
-      _StatCell(label: '1A atrás',
+      _StatCell(label: '1Y ago',
         value: prevYear != null ? _fmtValue(prevYear, detail.unit) : '—'),
       _VDivider(),
-      _StatCell(label: 'Var. anual',
+      _StatCell(label: 'YoY change',
         value: yearChange != null ? _fmtChange(yearChange, detail.unit) : '—',
         valueColor: yearColor),
       _VDivider(),
-      _StatCell(label: 'Máx.', value: _fmtValue(maxAll, detail.unit)),
+      _StatCell(label: 'Max', value: _fmtValue(maxAll, detail.unit)),
       _VDivider(),
-      _StatCell(label: 'Mín.', value: _fmtValue(minAll, detail.unit)),
+      _StatCell(label: 'Min', value: _fmtValue(minAll, detail.unit)),
     ]);
   }
 }
@@ -781,7 +781,7 @@ class _HistorySectionState extends State<_HistorySection> {
     final extra   = rows.length - _preview;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Histórico', style: TextStyle(
+      Text('History', style: TextStyle(
         fontSize: 11, fontWeight: FontWeight.w700,
         letterSpacing: 0.5, color: context.colors.textMuted)),
       const SizedBox(height: 6),
@@ -789,13 +789,13 @@ class _HistorySectionState extends State<_HistorySection> {
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(children: [
-          Expanded(child: Text('Data', style: TextStyle(
+          Expanded(child: Text('Date', style: TextStyle(
             fontSize: 9, fontWeight: FontWeight.w600,
             color: context.colors.textMuted))),
-          Text('Valor', style: TextStyle(
+          Text('Value', style: TextStyle(
             fontSize: 9, fontWeight: FontWeight.w600,
             color: context.colors.textMuted)),
-          SizedBox(width: 62, child: Text('Var.', textAlign: TextAlign.right,
+          SizedBox(width: 62, child: Text('Chg', textAlign: TextAlign.right,
             style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
               color: context.colors.textMuted))),
         ]),
@@ -839,7 +839,7 @@ class _HistorySectionState extends State<_HistorySection> {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(_showAll ? 'Ver menos' : 'Ver mais ($extra anteriores)',
+              Text(_showAll ? 'Show less' : 'Show more ($extra earlier)',
                 style: const TextStyle(fontSize: 12,
                   fontWeight: FontWeight.w600, color: AppColors.emerald)),
               const SizedBox(width: 4),
@@ -886,11 +886,11 @@ class _InlineError extends StatelessWidget {
     child: Row(children: [
       Icon(Icons.cloud_off_rounded, size: 16, color: context.colors.textMuted),
       const SizedBox(width: 8),
-      Text('Dados indisponíveis', style: TextStyle(
+      Text('Data unavailable', style: TextStyle(
         fontSize: 12, color: context.colors.textMuted)),
       const Spacer(),
       TextButton(onPressed: onRetry,
-        child: const Text('Tentar novamente',
+        child: const Text('Try again',
           style: TextStyle(fontSize: 11))),
     ]),
   );

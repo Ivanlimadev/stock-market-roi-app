@@ -256,7 +256,7 @@ class _CryptoDetailPageState extends ConsumerState<CryptoDetailPage> {
                   foregroundColor: AppColors.emerald,
                   side: BorderSide(color: AppColors.emerald),
                 ),
-                child: Text('Tentar novamente'),
+                child: Text('Try again'),
               ),
             ],
           ),
@@ -716,7 +716,7 @@ class _AboutSectionState extends State<_AboutSection> {
   @override
   Widget build(BuildContext context) {
     return _CardSection(
-      title: 'Sobre',
+      title: 'About',
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(

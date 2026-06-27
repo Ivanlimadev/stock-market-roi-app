@@ -91,8 +91,8 @@ class MacroDetailData {
   );
 
   List<MacroDataPoint> filter(String range) {
-    if (range == 'Máx' || data.isEmpty) return data;
-    final years = {'1A': 1, '2A': 2, '5A': 5, '10A': 10}[range] ?? 5;
+    if (range == 'Max' || data.isEmpty) return data;
+    final years = {'1Y': 1, '2Y': 2, '5Y': 5, '10Y': 10}[range] ?? 5;
     final cutoff = DateTime.now().subtract(Duration(days: years * 365));
     final filtered = data.where((p) => DateTime.parse(p.date).isAfter(cutoff)).toList();
     return filtered.isEmpty ? data : filtered;
