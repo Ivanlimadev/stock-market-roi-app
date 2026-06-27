@@ -5,6 +5,10 @@ import '../api/api_client.dart';
 import '../models/portfolio_model.dart';
 import 'realtime_price_provider.dart';
 
+/// "Street mode": when true, monetary balances are masked across the
+/// portfolio. In-memory (resets on restart), mirroring the theme preference.
+final hideBalancesProvider = StateProvider<bool>((ref) => false);
+
 // Ticker symbol → CoinGecko ID (mirrors realtime_price_provider's map)
 const kCryptoTickerToCoinId = <String, String>{
   'BTC':  'bitcoin',

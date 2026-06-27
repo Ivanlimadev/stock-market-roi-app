@@ -80,6 +80,17 @@ class _LoggedInPortfolioState extends ConsumerState<_LoggedInPortfolio>
       appBar: AppBar(
         title: Text('Portfolio'),
         actions: [
+          Consumer(builder: (_, r, _) {
+            final hide = r.watch(hideBalancesProvider);
+            return IconButton(
+              tooltip: hide ? 'Show balances' : 'Hide balances',
+              icon: Icon(hide
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded),
+              onPressed: () =>
+                  r.read(hideBalancesProvider.notifier).state = !hide,
+            );
+          }),
           MainShellMenu.searchButton(),
           MainShellMenu.themeButton(),
           MainShellMenu.settingsButton(),
@@ -139,8 +150,20 @@ class _ResumoContent extends ConsumerStatefulWidget {
   ConsumerState<_ResumoContent> createState() => _ResumoContentState();
 }
 
+enum _ChartPeriod {
+  m1('1M', 30),
+  m6('6M', 180),
+  y1('1Y', 365),
+  max('Max', 100000);
+
+  const _ChartPeriod(this.label, this.days);
+  final String label;
+  final int days;
+}
+
 class _ResumoContentState extends ConsumerState<_ResumoContent> {
   bool _snapshotSaved = false;
+  _ChartPeriod _period = _ChartPeriod.max;
 
   double get _totalValue =>
       widget.holdings.fold(0, (s, h) => s + h.currentValue);
@@ -181,6 +204,7 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
             value: fmt.format(_totalValue),
             icon: Icons.account_balance_wallet_rounded,
             color: AppColors.emerald,
+            sensitive: true,
           ),
           SizedBox(width: 12),
           _KpiCard(
@@ -188,6 +212,7 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
             value: fmt.format(_totalInvested),
             icon: Icons.payments_rounded,
             color: const Color(0xFF6366F1),
+            sensitive: true,
           ),
         ]),
         SizedBox(height: 12),
@@ -200,6 +225,7 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
                 : Icons.trending_down_rounded,
             color: isPositive ? AppColors.emerald : AppColors.red,
             valueColor: isPositive ? AppColors.emerald : AppColors.red,
+            sensitive: true,
           ),
           SizedBox(width: 12),
           _KpiCard(
@@ -215,9 +241,21 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
         snapshots.maybeWhen(
           data: (snaps) {
             if (snaps.length < 2) return const SizedBox(height: 24);
+            final cutoff =
+                DateTime.now().subtract(Duration(days: _period.days));
+            final filtered = _period == _ChartPeriod.max
+                ? snaps
+                : snaps
+                    .where((s) =>
+                        DateTime.tryParse(s.date)?.isAfter(cutoff) ?? true)
+                    .toList();
             return Padding(
               padding: const EdgeInsets.only(top: 24),
-              child: _PortfolioHistoryChart(snapshots: snaps),
+              child: _PortfolioHistoryChart(
+                snapshots: filtered,
+                period: _period,
+                onPeriodChanged: (p) => setState(() => _period = p),
+              ),
             );
           },
           orElse: () => const SizedBox(height: 24),
@@ -248,11 +286,54 @@ class _ResumoContentState extends ConsumerState<_ResumoContent> {
 
 class _PortfolioHistoryChart extends StatelessWidget {
   final List<PortfolioSnapshot> snapshots;
-  const _PortfolioHistoryChart({required this.snapshots});
+  final _ChartPeriod period;
+  final ValueChanged<_ChartPeriod> onPeriodChanged;
+  const _PortfolioHistoryChart({
+    required this.snapshots,
+    required this.period,
+    required this.onPeriodChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final c      = context.colors;
+    final c = context.colors;
+
+    Widget header(Widget? trailing) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Portfolio History',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary)),
+            _PeriodToggle(period: period, onChanged: onPeriodChanged),
+          ],
+        );
+
+    Widget card(List<Widget> children) => Container(
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border.all(color: c.border),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: children),
+        );
+
+    // Not enough points in the selected range to draw a line.
+    if (snapshots.length < 2) {
+      return card([
+        header(null),
+        const SizedBox(height: 24),
+        Center(
+          child: Text('Not enough history for this range yet.',
+              style: TextStyle(fontSize: 12, color: c.textMuted)),
+        ),
+        const SizedBox(height: 16),
+      ]);
+    }
+
     final values   = snapshots.map((s) => s.totalValue).toList();
     final invested = snapshots.map((s) => s.totalInvested).toList();
     final all      = [...values, ...invested];
@@ -266,30 +347,15 @@ class _PortfolioHistoryChart extends StatelessWidget {
     final investedSpots = List.generate(snapshots.length,
         (i) => FlSpot(i.toDouble(), snapshots[i].totalInvested));
 
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(14),
+    return card([
+      header(null),
+      const SizedBox(height: 4),
+      Text(
+        '${isPos ? '+' : ''}${((values.last / values.first - 1) * 100).toStringAsFixed(2)}% · ${period.label}',
+        style: TextStyle(
+            fontSize: 12, color: color, fontWeight: FontWeight.w600),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Portfolio History',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: c.textPrimary)),
-          const SizedBox(height: 4),
-          Text(
-            '${isPos ? '+' : ''}${((values.last / values.first - 1) * 100).toStringAsFixed(2)}% all time',
-            style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
+      const SizedBox(height: 8),
           Row(children: [
             Container(width: 10, height: 2, color: color),
             Text(' Value',
@@ -344,20 +410,52 @@ class _PortfolioHistoryChart extends StatelessWidget {
                   style: TextStyle(fontSize: 10, color: c.textMuted)),
             ],
           ),
-        ],
-      ),
+    ]);
+  }
+}
+
+class _PeriodToggle extends StatelessWidget {
+  final _ChartPeriod period;
+  final ValueChanged<_ChartPeriod> onChanged;
+  const _PeriodToggle({required this.period, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: _ChartPeriod.values.map((p) {
+        final sel = p == period;
+        return GestureDetector(
+          onTap: () => onChanged(p),
+          child: Container(
+            margin: const EdgeInsets.only(left: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: sel ? AppColors.emerald : c.surfaceAlt,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Text(p.label,
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: sel ? Colors.white : c.textMuted)),
+          ),
+        );
+      }).toList(),
     );
   }
 }
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
-class _KpiCard extends StatelessWidget {
+class _KpiCard extends ConsumerWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
   final Color? valueColor;
+  final bool sensitive;
 
   const _KpiCard({
     required this.label,
@@ -365,10 +463,13 @@ class _KpiCard extends StatelessWidget {
     required this.icon,
     required this.color,
     this.valueColor,
+    this.sensitive = false,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final shown =
+        sensitive && ref.watch(hideBalancesProvider) ? '••••' : value;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -395,7 +496,7 @@ class _KpiCard extends StatelessWidget {
                     color: context.colors.textMuted,
                     fontWeight: FontWeight.w500)),
             SizedBox(height: 4),
-            Text(value,
+            Text(shown,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -672,13 +773,14 @@ class _AtivosTab extends ConsumerWidget {
 
 // ── Type header ───────────────────────────────────────────────────────────────
 
-class _TypeHeader extends StatelessWidget {
+class _TypeHeader extends ConsumerWidget {
   final String type;
   final List<PortfolioHolding> holdings;
   const _TypeHeader({required this.type, required this.holdings});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hide = ref.watch(hideBalancesProvider);
     final color = _typeColors[type] ?? AppColors.emerald;
     final totalValue = holdings.fold(0.0, (s, h) => s + h.currentValue);
     final totalInvested = holdings.fold(0.0, (s, h) => s + h.costBasis);
@@ -711,7 +813,7 @@ class _TypeHeader extends StatelessWidget {
                 TextStyle(fontSize: 12, color: context.colors.textMuted)),
         const Spacer(),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('\$${totalValue.toStringAsFixed(2)}',
+          Text(hide ? '••••' : '\$${totalValue.toStringAsFixed(2)}',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -728,13 +830,14 @@ class _TypeHeader extends StatelessWidget {
 
 // ── Holding tile ──────────────────────────────────────────────────────────────
 
-class _HoldingTile extends StatelessWidget {
+class _HoldingTile extends ConsumerWidget {
   final PortfolioHolding holding;
   final double portfolioValue;
   const _HoldingTile({required this.holding, this.portfolioValue = 0});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hide = ref.watch(hideBalancesProvider);
     final h = holding;
     final isCrypto = h.assetType == 'crypto';
     final isPositive = h.gainLoss >= 0;
@@ -844,7 +947,7 @@ class _HoldingTile extends StatelessWidget {
 
           // Value + return
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('\$${h.currentValue.toStringAsFixed(2)}',
+            Text(hide ? '••••' : '\$${h.currentValue.toStringAsFixed(2)}',
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -995,6 +1098,7 @@ class _DividendosTab extends ConsumerWidget {
                 value: '\$${totalAnual.toStringAsFixed(2)}',
                 icon: Icons.savings_rounded,
                 color: AppColors.emerald,
+                sensitive: true,
               ),
               SizedBox(width: 12),
               _KpiCard(
@@ -1069,12 +1173,13 @@ class _DividendosTab extends ConsumerWidget {
   }
 }
 
-class _DividendTile extends StatelessWidget {
+class _DividendTile extends ConsumerWidget {
   final DividendInfo info;
   const _DividendTile({required this.info});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hide = ref.watch(hideBalancesProvider);
     final color = _typeColors[info.assetType] ?? AppColors.emerald;
 
     return Container(
@@ -1144,7 +1249,7 @@ class _DividendTile extends StatelessWidget {
 
         // Div/share + Annual + Yield
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('\$${info.annualTotal.toStringAsFixed(2)}/ano',
+          Text(hide ? '••••' : '\$${info.annualTotal.toStringAsFixed(2)}/ano',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
