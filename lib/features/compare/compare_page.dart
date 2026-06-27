@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/ads/rewarded_gate.dart';
+import '../../core/ads/rewarded_unlocks.dart';
 import '../../core/providers/screener_provider.dart';
 import '../../core/models/market_model.dart';
 import '../../core/utils/formatters.dart';
@@ -306,15 +308,22 @@ class _ComparePageState extends ConsumerState<ComparePage> {
                 ),
               )
             else
-              // ── Comparison table ─────────────────────────────────────────
+              // ── Comparison table (rewarded-gated) ────────────────────────
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
+                child: RewardedGate(
+                  featureKey: RewardedUnlocks.compare,
+                  icon: Icons.compare_arrows_rounded,
+                  title: 'Side-by-side comparison',
+                  description: 'Watch a short ad to unlock the full comparison — '
+                      'free for the rest of this session.',
                   child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _CompareTable(
-                        selected: _selected, metrics: _metrics),
+                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _CompareTable(
+                          selected: _selected, metrics: _metrics),
+                    ),
                   ),
                 ),
               ),

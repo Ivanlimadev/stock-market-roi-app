@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/theme_provider.dart';
 import '../providers/profile_provider.dart';
+import '../services/notification_inbox.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
 
@@ -50,6 +51,35 @@ class MainShellMenu {
         },
       );
 
+  /// Received-notifications inbox. Shows a green dot badge and turns green when
+  /// there are unread notifications.
+  static Widget inboxButton() =>
+      ValueListenableBuilder<List<InboxNotification>>(
+        valueListenable: NotificationInbox.items,
+        builder: (context, items, _) {
+          final unread = items.where((n) => !n.read).length;
+          final hasUnread = unread > 0;
+          return IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => context.push('/notifications'),
+            icon: Badge(
+              isLabelVisible: hasUnread,
+              backgroundColor: AppColors.emerald,
+              label: unread > 9
+                  ? const Text('9+')
+                  : (unread > 1 ? Text('$unread') : null),
+              smallSize: 8,
+              child: Icon(
+                hasUnread
+                    ? Icons.mark_email_unread_rounded
+                    : Icons.mail_outline_rounded,
+                color: hasUnread ? AppColors.emerald : null,
+              ),
+            ),
+          );
+        },
+      );
+
   /// Settings (account, notifications, support, etc.).
   static Widget settingsButton() => Builder(
         builder: (context) => IconButton(
@@ -64,9 +94,9 @@ class MainShellMenu {
   static Widget avatarButton() => Consumer(
         builder: (context, ref, _) {
           final c = context.colors;
-          final file = ref.watch(localAvatarProvider).valueOrNull;
+          final avatarUrl = ref.watch(profileProvider).valueOrNull?.avatarUrl;
           final loggedIn = Supabase.instance.client.auth.currentUser != null;
-          final hasPhoto = file != null;
+          final hasPhoto = avatarUrl != null;
           return Padding(
             padding: const EdgeInsets.only(right: 12, left: 2),
             child: GestureDetector(
@@ -74,7 +104,7 @@ class MainShellMenu {
               child: CircleAvatar(
                 radius: 15,
                 backgroundColor: c.surfaceAlt,
-                backgroundImage: hasPhoto ? FileImage(file) : null,
+                backgroundImage: hasPhoto ? NetworkImage(avatarUrl) : null,
                 child: hasPhoto
                     ? null
                     : Icon(Icons.person_rounded, size: 18, color: c.textMuted),

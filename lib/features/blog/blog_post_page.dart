@@ -12,6 +12,9 @@ import '../../core/providers/blog_provider.dart';
 import '../../core/providers/stock_detail_provider.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../core/widgets/app_footer.dart';
+import '../../core/widgets/author_byline.dart';
+import '../../core/widgets/comments_section.dart';
+import '../../core/ads/native_ad_tile.dart';
 
 // Busca o post completo pelo slug quando content não vem na navegação
 final _fullPostProvider = FutureProvider.autoDispose
@@ -75,8 +78,6 @@ class _PostBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final catColor = _catColors[post.category] ?? AppColors.emerald;
-
     final mdSheet = MarkdownStyleSheet(
       p:               TextStyle(fontSize: 15, color: context.colors.textSecond, height: 1.7),
       h1:              TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: context.colors.textPrimary, height: 1.3),
@@ -105,8 +106,6 @@ class _PostBody extends ConsumerWidget {
         border: Border(top: BorderSide(color: context.colors.border)),
       ),
     );
-
-    final mdContent = _buildMarkdown(post, catColor);
 
     return Scaffold(
       appBar: AppBar(
@@ -183,25 +182,8 @@ class _PostBody extends ConsumerWidget {
             ),
           const SizedBox(height: 8),
 
-          // ── Conteúdo do post ─────────────────────────────────────────────
-          MarkdownBody(
-            selectable: true,
-            onTapLink: (text, href, title) {
-              if (href == null) return;
-              final uri = Uri.tryParse(href);
-              if (uri == null) return;
-              final path = uri.path;
-              if (uri.host.isEmpty || uri.host.contains('stockmarketroi.com')) {
-                if (path.startsWith('/stocks/') || path.startsWith('/crypto/') || path.startsWith('/blog/')) {
-                  context.push(path);
-                  return;
-                }
-              }
-              launchUrl(uri, mode: LaunchMode.externalApplication);
-            },
-            styleSheet: mdSheet,
-            data: mdContent,
-          ),
+          // ── Conteúdo do post (com native ad in-article) ──────────────────
+          ..._articleContent(context, mdSheet),
 
           // ── Card do ativo relacionado ─────────────────────────────────
           if (post.tickers != null && post.tickers!.isNotEmpty) ...[
@@ -221,6 +203,12 @@ class _PostBody extends ConsumerWidget {
           // ── Mais artigos ─────────────────────────────────────────────────
           _MoreArticles(currentSlug: post.slug, category: post.category),
 
+          // ── Author byline (tap to expand) ────────────────────────────────
+          const AuthorByline(),
+
+          // ── Discussion ───────────────────────────────────────────────────
+          CommentsSection(target: (type: 'post', id: post.slug)),
+
           const SizedBox(height: 32),
 
           // ── Footer ───────────────────────────────────────────────────────
@@ -232,13 +220,56 @@ class _PostBody extends ConsumerWidget {
     );
   }
 
-  String _buildMarkdown(BlogPost post, Color catColor) {
-    final buf = StringBuffer();
-    if (post.imageUrl != null) buf.writeln('![${post.title}](${post.imageUrl})\n');
-    if (post.content != null && post.content!.isNotEmpty) {
-      buf.writeln(post.content);
+  /// Renders the article body, splitting it in half (on a paragraph boundary)
+  /// to drop a single in-article native ad into the middle — but only for posts
+  /// long enough that the ad isn't jammed next to the title or the footer.
+  List<Widget> _articleContent(BuildContext context, MarkdownStyleSheet sheet) {
+    final leadingImage =
+        post.imageUrl != null ? '![${post.title}](${post.imageUrl})\n\n' : '';
+    final content = post.content ?? '';
+
+    void onTapLink(String text, String? href, String? title) {
+      if (href == null) return;
+      final uri = Uri.tryParse(href);
+      if (uri == null) return;
+      final path = uri.path;
+      if (uri.host.isEmpty || uri.host.contains('stockmarketroi.com')) {
+        if (path.startsWith('/stocks/') ||
+            path.startsWith('/crypto/') ||
+            path.startsWith('/blog/')) {
+          context.push(path);
+          return;
+        }
+      }
+      launchUrl(uri, mode: LaunchMode.externalApplication);
     }
-    return buf.toString();
+
+    Widget md(String data) => MarkdownBody(
+          selectable: true,
+          onTapLink: onTapLink,
+          styleSheet: sheet,
+          data: data,
+        );
+
+    final paras =
+        content.split(RegExp(r'\n\s*\n')).where((p) => p.trim().isNotEmpty).toList();
+
+    // Short posts: render whole, no in-article ad.
+    if (paras.length < 6) {
+      return [md(leadingImage + content)];
+    }
+
+    final splitAt = (paras.length / 2).floor();
+    final first = paras.sublist(0, splitAt).join('\n\n');
+    final second = paras.sublist(splitAt).join('\n\n');
+
+    return [
+      md(leadingImage + first),
+      const SizedBox(height: 20),
+      const NativeAdTile(label: 'Advertisement'),
+      const SizedBox(height: 20),
+      md(second),
+    ];
   }
 
   String _timeAgo(String iso) {

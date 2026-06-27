@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/profile_provider.dart';
-import '../../core/services/local_avatar_service.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 
 class PerfilPage extends StatelessWidget {
@@ -137,8 +136,8 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
   Future<void> _changePhoto() async {
     setState(() => _busy = true);
     try {
-      final ok = await LocalAvatarService.pickAndSave();
-      if (ok) ref.invalidate(localAvatarProvider);
+      final ok = await ProfileService.pickAndUploadAvatar();
+      if (ok) ref.invalidate(profileProvider);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,8 +151,8 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
   Future<void> _removePhoto() async {
     setState(() => _busy = true);
     try {
-      await LocalAvatarService.remove();
-      ref.invalidate(localAvatarProvider);
+      await ProfileService.removeAvatar();
+      ref.invalidate(profileProvider);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -391,8 +390,8 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
 
     setState(() => _loading = true);
     try {
-      // Local-only avatar — drop it from the device before wiping the account.
-      await LocalAvatarService.remove();
+      // Drop the avatar from Storage before wiping the account.
+      await ProfileService.removeAvatar();
       await Supabase.instance.client.rpc('delete_user');
       await Supabase.instance.client.auth.signOut();
       if (mounted) context.go('/home');
@@ -415,7 +414,7 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
     final memberSince = _formatDate(user.createdAt);
 
     final profile    = ref.watch(profileProvider).valueOrNull;
-    final avatarFile = ref.watch(localAvatarProvider).valueOrNull;
+    final avatarUrl  = profile?.avatarUrl;
     final displayName = (profile?.displayName?.isNotEmpty ?? false)
         ? profile!.displayName!
         : null;
@@ -437,7 +436,7 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
               // Avatar — tap to change/remove photo
               Center(
                 child: GestureDetector(
-                  onTap: () => _showPhotoActions(hasPhoto: avatarFile != null),
+                  onTap: () => _showPhotoActions(hasPhoto: avatarUrl != null),
                   child: Stack(
                     children: [
                       Container(
@@ -445,13 +444,13 @@ class _LoggedPerfilState extends ConsumerState<_LoggedPerfil> {
                         decoration: BoxDecoration(
                           color: AppColors.emerald.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(40),
-                          image: avatarFile != null
+                          image: avatarUrl != null
                               ? DecorationImage(
-                                  image: FileImage(avatarFile),
+                                  image: NetworkImage(avatarUrl),
                                   fit: BoxFit.cover)
                               : null,
                         ),
-                        child: avatarFile == null
+                        child: avatarUrl == null
                             ? Center(
                                 child: Text(initials,
                                     style: TextStyle(

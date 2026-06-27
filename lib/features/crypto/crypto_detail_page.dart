@@ -16,6 +16,7 @@ import '../../core/providers/watchlist_provider.dart';
 import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
 import '../../core/widgets/app_footer.dart';
+import '../../core/widgets/comments_section.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../core/widgets/auth_prompt_sheet.dart';
 
@@ -469,6 +470,9 @@ class _CryptoBody extends ConsumerWidget {
 
         // ── Related articles ──────────────────────────────────────────────────
         _RelatedArticles(coinId: coinId),
+
+        // ── Discussion ────────────────────────────────────────────────────────
+        CommentsSection(target: (type: 'crypto', id: coinId)),
 
         // ── Footer ────────────────────────────────────────────────────────────
         const AppFooter(),

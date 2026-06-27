@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../router/app_router.dart';
+import 'notification_inbox.dart';
 
 // Must be top-level — runs in a separate isolate when app is terminated
 @pragma('vm:entry-point')
@@ -27,6 +29,7 @@ class NotificationService {
   static Future<void> initialize() async {
     FirebaseMessaging.onBackgroundMessage(_backgroundHandler);
 
+    await NotificationInbox.load();
     await _requestPermission();
     await _initLocalNotifications();
     await _createAndroidChannel();
@@ -39,7 +42,10 @@ class NotificationService {
 
     // User tapped notification that launched the app from terminated state
     final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) _navigateFromData(initial.data);
+    if (initial != null) {
+      _recordInbox(initial, read: true);
+      _navigateFromData(initial.data);
+    }
 
     // Register FCM token whenever it changes (first run + token rotation)
     FirebaseMessaging.instance.onTokenRefresh.listen((_) => _saveToken());
@@ -86,7 +92,7 @@ class NotificationService {
       badge: true,
       sound: true,
     );
-    print('[FCM] permission status: ${settings.authorizationStatus}');
+    debugPrint('[FCM] permission status: ${settings.authorizationStatus}');
     // iOS foreground notifications must be explicitly enabled
     await FirebaseMessaging.instance
         .setForegroundNotificationPresentationOptions(
@@ -124,7 +130,20 @@ class NotificationService {
         ?.createNotificationChannel(channel);
   }
 
+  /// Persists a received message into the local inbox.
+  static void _recordInbox(RemoteMessage message, {bool read = false}) {
+    final n = message.notification;
+    NotificationInbox.add(
+      id: message.messageId,
+      title: n?.title ?? '',
+      body: n?.body ?? '',
+      data: message.data,
+      read: read,
+    );
+  }
+
   static Future<void> _onForegroundMessage(RemoteMessage message) async {
+    _recordInbox(message);
     final n = message.notification;
     if (n == null) return;
     await _fln.show(
@@ -156,14 +175,22 @@ class NotificationService {
     _navigateFromData(data);
   }
 
-  static void _onMessageTap(RemoteMessage message) =>
-      _navigateFromData(message.data);
+  static void _onMessageTap(RemoteMessage message) {
+    _recordInbox(message, read: true);
+    _navigateFromData(message.data);
+  }
+
+  /// Public entry point used by the in-app notification inbox to route on tap.
+  static void navigateFromData(Map<String, dynamic> data) =>
+      _navigateFromData(data);
 
   // Notification payload types sent by Supabase Edge Functions:
   //   price_alert   → data: { type, symbol }
   //   dividend_alert→ data: { type, symbol }
   //   blog_post     → data: { type, slug }
   //   monthly_report→ data: { type }
+  //   market_close  → data: { type }
+  //   market_open   → data: { type, symbol }
   static void _navigateFromData(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     final symbol = (data['symbol'] as String?)?.toLowerCase();
@@ -172,34 +199,37 @@ class NotificationService {
     switch (type) {
       case 'price_alert':
       case 'dividend_alert':
+      case 'market_open':
         if (symbol != null) appRouter.push('/stocks/$symbol');
       case 'blog_post':
         if (slug != null) appRouter.push('/blog/$slug');
       case 'monthly_report':
         appRouter.push('/portfolio');
+      case 'market_close':
+        appRouter.push('/home');
     }
   }
 
   static Future<void> _saveToken() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      print('[FCM] _saveToken: no logged-in user, skipping');
+      debugPrint('[FCM] _saveToken: no logged-in user, skipping');
       return;
     }
 
     if (Platform.isIOS) {
       final apns = await FirebaseMessaging.instance.getAPNSToken();
-      print('[FCM] APNS token: ${apns == null ? "NULL (not ready)" : "present"}');
+      debugPrint('[FCM] APNS token: ${apns == null ? "NULL (not ready)" : "present"}');
     }
 
     String? token;
     try {
       token = await FirebaseMessaging.instance.getToken();
     } catch (e) {
-      print('[FCM] getToken() threw: $e');
+      debugPrint('[FCM] getToken() threw: $e');
       return;
     }
-    print('[FCM] _saveToken user=${user.id} '
+    debugPrint('[FCM] _saveToken user=${user.id} '
         'token=${token == null ? "NULL" : "${token.substring(0, 12)}…"}');
     if (token == null) return;
 
@@ -213,9 +243,9 @@ class NotificationService {
         },
         onConflict: 'user_id,token',
       );
-      print('[FCM] token upsert OK ✅');
+      debugPrint('[FCM] token upsert OK ✅');
     } catch (e) {
-      print('[FCM] upsert error: $e');
+      debugPrint('[FCM] upsert error: $e');
     }
   }
 }

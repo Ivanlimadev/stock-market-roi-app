@@ -56,6 +56,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     setState(() => _searching = false);
   }
 
+  /// Enters search mode. Pre-fills a popular ticker (selected, so typing
+  /// replaces it) so results/cards show immediately instead of a blank screen.
+  void _enterSearch() {
+    if (!_searching) setState(() => _searching = true);
+    if (_searchCtrl.text.isEmpty) {
+      const seed = 'NVDA';
+      _searchCtrl.text = seed;
+      _searchCtrl.selection =
+          TextSelection(baseOffset: 0, extentOffset: seed.length);
+      ref.read(_stockQueryProvider.notifier).state = seed;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final query      = ref.watch(_stockQueryProvider);
@@ -64,26 +77,48 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // Lets the shared search button (from any tab) open search here.
     ref.listen(searchTriggerProvider, (_, __) {
-      if (mounted && !_searching) setState(() => _searching = true);
+      if (mounted) _enterSearch();
     });
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: _searching ? 4 : NavigationToolbar.kMiddleSpacing,
+        titleSpacing: _searching ? 8 : NavigationToolbar.kMiddleSpacing,
         title: _searching
-            ? TextField(
-                controller: _searchCtrl,
-                focusNode: _focusNode,
-                autofocus: true,
-                style: TextStyle(color: context.colors.textPrimary, fontSize: 16),
-                decoration: InputDecoration(
-                  hintText: 'Search stocks and crypto…',
-                  hintStyle: TextStyle(color: context.colors.textMuted),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
+            ? Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: context.colors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onChanged: (v) => ref.read(_stockQueryProvider.notifier).state = v.trim(),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_rounded,
+                        size: 20, color: context.colors.textMuted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        focusNode: _focusNode,
+                        autofocus: true,
+                        textInputAction: TextInputAction.search,
+                        style: TextStyle(
+                            color: context.colors.textPrimary, fontSize: 16),
+                        decoration: InputDecoration(
+                          hintText: 'Search stocks and crypto…',
+                          hintStyle: TextStyle(color: context.colors.textMuted),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onChanged: (v) => ref
+                            .read(_stockQueryProvider.notifier)
+                            .state = v.trim(),
+                      ),
+                    ),
+                  ],
+                ),
               )
             : Text('Markets'),
         leading: _searching
@@ -95,7 +130,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           else if (!_searching) ...[
             IconButton(
               icon: Icon(Icons.search_rounded),
-              onPressed: () => setState(() => _searching = true),
+              onPressed: _enterSearch,
             ),
             MainShellMenu.themeButton(),
             MainShellMenu.settingsButton(),
@@ -511,14 +546,15 @@ class _MarketsBodyState extends ConsumerState<_MarketsBody> {
             error: (_, __) => const SizedBox.shrink(),
             data: (data) {
               if (data.indices.isEmpty) return const SizedBox.shrink();
-              return SizedBox(
-                height: 112,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  separatorBuilder: (_, __) => SizedBox(width: 10),
-                  itemCount: data.indices.length,
-                  itemBuilder: (_, i) => IndexCard(index: data.indices[i]),
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    for (int i = 0; i < data.indices.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(child: IndexCard(index: data.indices[i])),
+                    ],
+                  ],
                 ),
               );
             },

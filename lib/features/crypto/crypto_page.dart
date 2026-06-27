@@ -543,7 +543,6 @@ class _RankingSection extends ConsumerWidget {
       List<({String id, String name, String symbol, String image, double price, double change, int rank})> coins) {
     return Column(
       children: coins.map((c) {
-        final up = c.change >= 0;
         return InkWell(
           onTap: () => context.push('/crypto/${c.id}'),
           borderRadius: BorderRadius.circular(10),
@@ -1025,6 +1024,12 @@ class _FundingSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(cryptoFundingProvider);
+    // Funding data has no logo of its own — borrow each coin's image from the
+    // markets list, matched by symbol (case-insensitive).
+    final logos = <String, String>{
+      for (final m in (ref.watch(cryptoMarketsProvider).asData?.value ?? const []))
+        m.symbol.toUpperCase(): m.image,
+    };
     return async.when(
       loading: () => const SizedBox.shrink(),
       error:   (_, __) => const SizedBox.shrink(),
@@ -1053,6 +1058,7 @@ class _FundingSection extends ConsumerWidget {
                   final r      = rates[i];
                   final isPos  = r.ratePct >= 0;
                   final color  = isPos ? AppColors.emerald : AppColors.red;
+                  final logo   = logos[r.symbol.toUpperCase()];
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -1062,6 +1068,14 @@ class _FundingSection extends ConsumerWidget {
                     ),
                     child: Row(
                       children: [
+                        ClipOval(
+                          child: (logo != null && logo.isNotEmpty)
+                              ? Image.network(logo, width: 26, height: 26,
+                                  errorBuilder: (_, __, ___) =>
+                                      _CoinFallback(symbol: r.symbol, size: 26))
+                              : _CoinFallback(symbol: r.symbol, size: 26),
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

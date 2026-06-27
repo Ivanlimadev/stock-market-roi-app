@@ -34,9 +34,12 @@ import '../../features/editorial/editorial_rankings_page.dart';
 import '../../features/finance/us_macro_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/settings/notifications_page.dart';
+import '../../features/notifications/notifications_inbox_page.dart';
 import '../../features/legal/web_view_page.dart';
 
-final _rootKey = GlobalKey<NavigatorState>();
+/// Root navigator key — also used by non-widget code (e.g. AdManager's ATT
+/// priming) that needs a [BuildContext] to show app-wide dialogs.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
 
 /// Re-runs the router's [redirect] whenever the Supabase auth state changes
@@ -56,7 +59,7 @@ class _AuthRefresh extends ChangeNotifier {
 }
 
 final appRouter = GoRouter(
-  navigatorKey: _rootKey,
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/home',
   refreshListenable: _AuthRefresh(),
   redirect: (context, state) {
@@ -88,6 +91,9 @@ final appRouter = GoRouter(
 
     // Settings — outside shell (full screen, back button)
     GoRoute(path: '/settings',  builder: (_, $) => const SettingsPage()),
+
+    // Notifications inbox — outside shell (full screen, back button)
+    GoRoute(path: '/notifications', builder: (_, $) => const NotificationsInboxPage()),
     GoRoute(path: '/settings/notifications', builder: (_, $) => const NotificationsPage()),
 
     // Legal / About — in-app web views (kept inside the app, no external browser)

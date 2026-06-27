@@ -13,11 +13,18 @@ import '../../core/models/stock_detail_model.dart';
 import '../../core/models/blog_post_model.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/ads/ad_manager.dart';
+import '../../core/ads/collapsible_banner_ad.dart';
+import '../../core/ads/rewarded_gate.dart';
+import '../../core/ads/rewarded_unlocks.dart';
 import '../../core/providers/watchlist_provider.dart';
+import '../../core/providers/portfolio_provider.dart';
+import '../portfolio/add_transaction_sheet.dart';
 import '../../core/widgets/add_alert_dialog.dart';
 import '../../core/providers/financials_provider.dart';
 import '../../core/utils/share_utils.dart';
 import '../../core/widgets/app_footer.dart';
+import '../../core/widgets/comments_section.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../core/widgets/auth_prompt_sheet.dart';
 
@@ -39,7 +46,7 @@ class StockDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(sym),
         actions: [
-          ...MainShellMenu.actions(),
+          MainShellMenu.searchButton(),
           // Favorite — always visible; prompts auth if not logged in
           IconButton(
             icon: Icon(
@@ -97,9 +104,17 @@ class StockDetailPage extends ConsumerWidget {
               ),
             ),
           ),
+          MainShellMenu.avatarButton(),
+          MainShellMenu.settingsButton(),
         ],
       ),
-      bottomNavigationBar: const AppBottomNav(),
+      bottomNavigationBar: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CollapsibleBannerAd(),
+          AppBottomNav(),
+        ],
+      ),
       body: async.when(
         loading: () => Center(child: CircularProgressIndicator(color: AppColors.emerald)),
         error: (e, _) => Center(
@@ -188,6 +203,11 @@ class _BodyState extends ConsumerState<_Body> {
                         fontWeight: FontWeight.w700)),
                 ),
               ),
+              SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: _AddToPortfolioButton(sym: sym),
+              ),
             ],
           ),
         ),
@@ -272,8 +292,15 @@ class _BodyState extends ConsumerState<_Body> {
         // ── Earnings History (quarterly EPS) ─────────────────────────────────
         _EarningsHistorySection(sym: sym),
 
-        // ── Financial Charts (revenue / net income) ───────────────────────────
-        _FinancialSection(sym: sym),
+        // ── Financial Charts (revenue / net income, rewarded-gated) ───────────
+        RewardedGate(
+          featureKey: RewardedUnlocks.financials,
+          icon: Icons.bar_chart_rounded,
+          title: 'Financials',
+          description: 'Watch a short ad to unlock revenue & net income charts — '
+              'stays unlocked for every stock this session.',
+          child: _FinancialSection(sym: sym),
+        ),
 
         // ── Key Statistics ───────────────────────────────────────────────────
         if (info != null) _KeyStats(info: info, stock: stock),
@@ -300,14 +327,31 @@ class _BodyState extends ConsumerState<_Body> {
         if (info?.description != null && info!.description!.isNotEmpty)
           _About(text: info.description!),
 
-        // ── SEC Filings ───────────────────────────────────────────────────────
-        _SecFilingsSection(sym: sym),
+        // ── SEC Filings (rewarded-gated) ──────────────────────────────────────
+        RewardedGate(
+          featureKey: RewardedUnlocks.secFilings,
+          icon: Icons.description_outlined,
+          title: 'SEC Filings',
+          description: 'Watch a short ad to unlock the latest SEC filings — '
+              'stays unlocked for every stock this session.',
+          child: _SecFilingsSection(sym: sym),
+        ),
 
-        // ── Insider Transactions (SEC Form 4) ─────────────────────────────────
-        _InsiderSection(sym: sym),
+        // ── Insider Transactions (SEC Form 4, rewarded-gated) ─────────────────
+        RewardedGate(
+          featureKey: RewardedUnlocks.insiders,
+          icon: Icons.badge_outlined,
+          title: 'Insider Transactions',
+          description: 'Watch a short ad to unlock insider (Form 4) trades — '
+              'stays unlocked for every stock this session.',
+          child: _InsiderSection(sym: sym),
+        ),
 
         // ── Related Articles ──────────────────────────────────────────────────
         _RelatedArticles(sym: sym),
+
+        // ── Discussion ────────────────────────────────────────────────────────
+        CommentsSection(target: (type: 'stock', id: sym)),
 
         // ── Footer ────────────────────────────────────────────────────────────
         const AppFooter(),
@@ -1336,15 +1380,89 @@ class _Section extends StatelessWidget {
   );
 }
 
+// ── Add to portfolio button ───────────────────────────────────────────────────
+
+class _AddToPortfolioButton extends ConsumerWidget {
+  final String sym;
+  const _AddToPortfolioButton({required this.sym});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inPortfolio = ref.watch(portfolioSymbolsProvider).contains(sym);
+    final isLoggedIn = Supabase.instance.client.auth.currentUser != null;
+    final accent = inPortfolio ? AppColors.emerald : context.colors.textSecond;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () {
+        if (!isLoggedIn) {
+          showAuthPromptSheet(context, action: 'add to your portfolio');
+          return;
+        }
+        showAddTransactionSheet(context, initialSymbol: sym);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            inPortfolio
+                ? Icons.account_balance_wallet_rounded
+                : Icons.account_balance_wallet_outlined,
+            size: 16, color: accent,
+          ),
+          if (!inPortfolio) ...[
+            SizedBox(width: 1),
+            Icon(Icons.add_rounded, size: 14, color: accent),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
 // ── AI Insight ────────────────────────────────────────────────────────────────
 
-class _AIInsightCard extends ConsumerWidget {
+class _AIInsightCard extends ConsumerStatefulWidget {
   final String sym;
   const _AIInsightCard({required this.sym});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(stockAIInsightProvider(sym));
+  ConsumerState<_AIInsightCard> createState() => _AIInsightCardState();
+}
+
+class _AIInsightCardState extends ConsumerState<_AIInsightCard> {
+  bool _unlocked = false;
+  bool _loadingAd = false;
+
+  String get sym => widget.sym;
+
+  void _unlock() {
+    setState(() => _loadingAd = true);
+    AdManager.instance.showRewarded(
+      onReward: () {
+        if (mounted) setState(() => _unlocked = true);
+      },
+      onUnavailable: () {
+        if (!mounted) return;
+        setState(() {
+          _loadingAd = false;
+          _unlocked = true; // don't punish the user if no ad is available
+        });
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Teaser uses a reduced payload (no bull/bear); the full analysis is only
+    // fetched once the rewarded ad has unlocked it.
+    final async = _unlocked
+        ? ref.watch(stockAIInsightProvider(sym))
+        : ref.watch(stockAIInsightTeaserProvider(sym));
 
     return _Section(
       title: 'AI Insight',
@@ -1372,6 +1490,7 @@ class _AIInsightCard extends ConsumerWidget {
         ),
         error: (_, __) => const SizedBox.shrink(),
         data: (insight) {
+          if (!_unlocked) return _teaser(context, insight);
           final cfg = _verdictCfg(insight.verdict);
           return Padding(
             padding: const EdgeInsets.all(16),
@@ -1440,6 +1559,104 @@ class _AIInsightCard extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Free teaser: real verdict + confidence + a clipped summary, with the full
+  /// bull/bear analysis blurred behind a rewarded-ad gate.
+  Widget _teaser(BuildContext context, AIInsight insight) {
+    final c = context.colors;
+    final cfg = _verdictCfg(insight.verdict);
+    final summary = insight.summary;
+    final teaser = summary.length > 130
+        ? '${summary.substring(0, 130).trimRight()}…'
+        : summary;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(children: [
+            Icon(Icons.auto_awesome_rounded, size: 16, color: const Color(0xFF8B5CF6)),
+            SizedBox(width: 6),
+            Text('Powered by Claude',
+                style: TextStyle(fontSize: 11, color: const Color(0xFF8B5CF6),
+                    fontWeight: FontWeight.w600)),
+          ]),
+          SizedBox(height: 14),
+          // Verdict + confidence (shown free — the hook)
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: cfg.$1.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cfg.$1.withValues(alpha: 0.3)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(cfg.$2, size: 16, color: cfg.$1),
+                SizedBox(width: 6),
+                Text(insight.verdict,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                        color: cfg.$1, letterSpacing: 0.5)),
+              ]),
+            ),
+            SizedBox(width: 12),
+            Text('Confidence: ',
+                style: TextStyle(fontSize: 12, color: c.textMuted)),
+            Text(insight.confidence,
+                style: TextStyle(fontSize: 12, color: c.textSecond,
+                    fontWeight: FontWeight.w600)),
+          ]),
+          SizedBox(height: 14),
+          // Clipped summary with a fade-out at the bottom
+          ShaderMask(
+            shaderCallback: (rect) => LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [c.textSecond, c.textSecond.withValues(alpha: 0.15)],
+            ).createShader(rect),
+            blendMode: BlendMode.srcIn,
+            child: Text(teaser,
+                style: TextStyle(fontSize: 13, color: c.textSecond, height: 1.55)),
+          ),
+          SizedBox(height: 16),
+          // Locked full analysis
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+            decoration: BoxDecoration(
+              color: c.surfaceAlt.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: c.surfaceAlt),
+            ),
+            child: Column(children: [
+              Icon(Icons.lock_outline_rounded, size: 22, color: c.textMuted),
+              SizedBox(height: 8),
+              Text('Bull case, bear case & full analysis',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: c.textSecond,
+                      fontWeight: FontWeight.w600)),
+              SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _loadingAd ? null : _unlock,
+                  icon: _loadingAd
+                      ? const SizedBox(width: 16, height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.play_circle_outline_rounded, size: 18),
+                  label: Text(_loadingAd
+                      ? 'Loading…'
+                      : 'Watch ad to reveal full analysis'),
+                ),
+              ),
+            ]),
+          ),
+        ],
       ),
     );
   }

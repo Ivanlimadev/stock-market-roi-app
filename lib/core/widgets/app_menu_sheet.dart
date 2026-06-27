@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
+import '../services/notification_inbox.dart';
 
 /// App-wide menu (tools + markets) shown as a modal bottom sheet so it works
 /// from any screen — shell pages and pushed full-screen pages alike.
@@ -9,6 +10,7 @@ Future<void> showAppMenu(BuildContext context) {
     context: context,
     backgroundColor: context.colors.background,
     isScrollControlled: true,
+    useSafeArea: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -55,6 +57,16 @@ class _AppMenu extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
+                const _MenuSection('You'),
+                _NotificationsMenuItem(
+                  onTap: () => _go(context, '/notifications'),
+                ),
+                _MenuItem(
+                  icon: Icons.calculate_rounded,
+                  label: 'Calculators',
+                  onTap: () => _go(context, '/calculators'),
+                ),
+                const SizedBox(height: 8),
                 const _MenuSection('Markets'),
                 _MenuItem(
                   icon: Icons.currency_bitcoin,
@@ -103,16 +115,95 @@ class _AppMenu extends StatelessWidget {
                   label: 'Editorial Rankings',
                   onTap: () => _go(context, '/editorial'),
                 ),
+                const SizedBox(height: 8),
+                const _MenuSection('Legal'),
                 _MenuItem(
-                  icon: Icons.calculate_rounded,
-                  label: 'Calculators',
-                  onTap: () => _go(context, '/calculators'),
+                  icon: Icons.info_outline_rounded,
+                  label: 'About Us',
+                  onTap: () => _go(context, '/about'),
+                ),
+                _MenuItem(
+                  icon: Icons.shield_outlined,
+                  label: 'Privacy Policy',
+                  onTap: () => _go(context, '/privacy'),
+                ),
+                _MenuItem(
+                  icon: Icons.description_outlined,
+                  label: 'Terms of Use',
+                  onTap: () => _go(context, '/terms'),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Notifications row with a live green badge for unread items.
+class _NotificationsMenuItem extends StatelessWidget {
+  final VoidCallback onTap;
+  const _NotificationsMenuItem({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ValueListenableBuilder<List<InboxNotification>>(
+      valueListenable: NotificationInbox.items,
+      builder: (context, items, _) {
+        final unread = items.where((n) => !n.read).length;
+        final hasUnread = unread > 0;
+        return InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: hasUnread
+                      ? AppColors.emerald.withValues(alpha: 0.15)
+                      : c.surfaceAlt,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  hasUnread
+                      ? Icons.mark_email_unread_rounded
+                      : Icons.mail_outline_rounded,
+                  size: 18,
+                  color: hasUnread ? AppColors.emerald : c.textSecond,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text('Notifications',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: c.textPrimary)),
+              ),
+              if (hasUnread)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.emerald,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(unread > 9 ? '9+' : '$unread',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ),
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+            ]),
+          ),
+        );
+      },
     );
   }
 }
