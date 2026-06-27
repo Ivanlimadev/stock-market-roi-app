@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import '../data/blog_authors.dart';
 
 /// Author card shown at the end of a blog post — compact by default, expands on
-/// tap to reveal the full bio and social links (mirrors the website byline).
+/// tap to reveal the full bio (and, for the founder, social links). Driven by
+/// the post's resolved [BlogAuthor].
 class AuthorByline extends StatefulWidget {
-  const AuthorByline({super.key});
+  final BlogAuthor author;
+  const AuthorByline({super.key, required this.author});
 
   @override
   State<AuthorByline> createState() => _AuthorBylineState();
@@ -14,20 +17,13 @@ class AuthorByline extends StatefulWidget {
 class _AuthorBylineState extends State<AuthorByline> {
   bool _expanded = false;
 
-  static const _bio =
-      'Systems Analysis & Development student and active US stock market '
-      'investor since 2018. Ivan built Stock Market ROI to give retail investors '
-      'direct access to the same data and analytical tools he wished existed when '
-      'he started. Every article is written from the perspective of someone with '
-      'real skin in the game — tracking earnings, reading SEC filings, and '
-      'following market cycles for over eight years.';
-
   Future<void> _open(String url) =>
       launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final a = widget.author;
     return Container(
       margin: const EdgeInsets.only(top: 28),
       padding: const EdgeInsets.all(14),
@@ -45,17 +41,17 @@ class _AuthorBylineState extends State<AuthorByline> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipOval(
-                  child: Image.network(
-                    'https://stockmarketroi.com/ivan-lima.jpg',
+                  child: Image.asset(
+                    a.photo,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 44,
                       height: 44,
                       color: AppColors.emerald.withValues(alpha: 0.15),
                       alignment: Alignment.center,
-                      child: Text('IL',
+                      child: Text(a.initials,
                           style: TextStyle(
                               color: AppColors.emerald,
                               fontWeight: FontWeight.w800)),
@@ -69,22 +65,23 @@ class _AuthorBylineState extends State<AuthorByline> {
                     children: [
                       Text.rich(TextSpan(children: [
                         TextSpan(
-                            text: 'Ivan Lima',
+                            text: a.name,
                             style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: c.textPrimary)),
                         TextSpan(
-                            text: '  · Author',
+                            text: '  · ${a.role}',
                             style: TextStyle(
                                 fontSize: 12, color: AppColors.emerald)),
                       ])),
                       const SizedBox(height: 3),
                       Text(
-                        _bio,
+                        a.bio,
                         maxLines: _expanded ? null : 1,
-                        overflow:
-                            _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                        overflow: _expanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 12, height: 1.5, color: c.textMuted),
                       ),
@@ -109,7 +106,7 @@ class _AuthorBylineState extends State<AuthorByline> {
               ],
             ),
           ),
-          if (_expanded) ...[
+          if (_expanded && a.founder) ...[
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.only(left: 56),

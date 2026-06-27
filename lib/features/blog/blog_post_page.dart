@@ -13,6 +13,7 @@ import '../../core/providers/stock_detail_provider.dart';
 import '../../core/widgets/app_bottom_nav.dart';
 import '../../core/widgets/app_footer.dart';
 import '../../core/widgets/author_byline.dart';
+import '../../core/data/blog_authors.dart';
 import '../../core/widgets/comments_section.dart';
 import '../../core/ads/native_ad_tile.dart';
 
@@ -21,7 +22,7 @@ final _fullPostProvider = FutureProvider.autoDispose
     .family<BlogPost, String>((ref, slug) async {
   final data = await Supabase.instance.client
       .from('blog_posts')
-      .select('slug, title, excerpt, content, image_url, category, published_at, tickers')
+      .select('slug, title, excerpt, content, image_url, category, published_at, tickers, author_slug')
       .eq('slug', slug)
       .single();
   return BlogPost.fromJson(data);
@@ -204,7 +205,7 @@ class _PostBody extends ConsumerWidget {
           _MoreArticles(currentSlug: post.slug, category: post.category),
 
           // ── Author byline (tap to expand) ────────────────────────────────
-          const AuthorByline(),
+          AuthorByline(author: authorForSlug(post.authorSlug)),
 
           // ── Discussion ───────────────────────────────────────────────────
           CommentsSection(target: (type: 'post', id: post.slug)),

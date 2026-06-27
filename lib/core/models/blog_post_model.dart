@@ -7,6 +7,7 @@ class BlogPost {
   final String category;
   final String publishedAt;
   final List<String>? tickers;
+  final String? authorSlug;
 
   const BlogPost({
     required this.slug,
@@ -17,6 +18,7 @@ class BlogPost {
     required this.category,
     required this.publishedAt,
     this.tickers,
+    this.authorSlug,
   });
 
   factory BlogPost.fromJson(Map<String, dynamic> j) => BlogPost(
@@ -28,5 +30,6 @@ class BlogPost {
     category:    j['category'] as String? ?? 'General',
     publishedAt: j['published_at'] as String? ?? '',
     tickers:     (j['tickers'] as List?)?.map((e) => e as String).toList(),
+    authorSlug:  j['author_slug'] as String?,
   );
 }
