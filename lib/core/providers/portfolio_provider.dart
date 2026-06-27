@@ -154,7 +154,13 @@ final portfolioDividendsProvider =
 // Dividends the user actually received, computed from their transaction
 // history × each stock's dividend payment history (from /stocks/{sym}). For a
 // payment on its ex-date, counts the net shares held strictly before that date.
-// Estimate: ignores stock splits between the payment and today.
+//
+// Splits: no adjustment is applied, and that is correct here — Yahoo's
+// per-share dividend figures are back-adjusted to the CURRENT share basis
+// (e.g. AAPL's 2012 payment is reported post 7:1+4:1 splits), and users record
+// holdings in current (post-split) shares, so both sides already share the same
+// basis. Applying a split factor would double-count it. Only wrong if someone
+// manually enters a pre-split share count for a pre-split purchase.
 final portfolioReceivedDividendsProvider =
     FutureProvider.autoDispose<List<ReceivedDividend>>((ref) async {
   final txs = await ref.watch(portfolioTransactionsProvider.future);

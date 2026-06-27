@@ -139,8 +139,10 @@ class DividendInfo {
 }
 
 /// A dividend payment the user actually earned: shares held as of the
-/// ex-dividend date × the dividend per share. Estimated — ignores stock
-/// splits between the payment date and today.
+/// ex-dividend date × the dividend per share. The per-share figures are
+/// already split-adjusted to the current share basis (Yahoo), matching how
+/// holdings are recorded (current/post-split shares), so no split factor is
+/// applied — the two line up by construction.
 class ReceivedDividend {
   final String symbol;
   final DateTime date; // ex-dividend date
