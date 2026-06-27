@@ -60,7 +60,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 style: TextStyle(fontSize: 13, color: c.textSecond, height: 1.4),
               ),
               const SizedBox(height: 16),
-              Text('Type APAGAR to confirm',
+              Text('Type DELETE to confirm',
                   style: TextStyle(fontSize: 12, color: c.textMuted)),
               const SizedBox(height: 8),
               TextField(
@@ -71,7 +71,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     fontSize: 14,
                     fontWeight: FontWeight.w700),
                 decoration: InputDecoration(
-                  hintText: 'APAGAR',
+                  hintText: 'DELETE',
                   hintStyle: TextStyle(color: c.textMuted),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -93,8 +93,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               child: Text('Cancel', style: TextStyle(color: c.textMuted)),
             ),
             FilledButton(
-              onPressed:
-                  ctrl.text == 'APAGAR' ? () => Navigator.of(ctx).pop(true) : null,
+              onPressed: ctrl.text.trim().toUpperCase() == 'DELETE'
+                  ? () => Navigator.of(ctx).pop(true)
+                  : null,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.red,
                 foregroundColor: Colors.white,
