@@ -1197,9 +1197,50 @@ class _ReceivedDividendsSection extends ConsumerWidget {
     final c = context.colors;
     final async = ref.watch(portfolioReceivedDividendsProvider);
 
+    Widget header() => Row(children: [
+          Text('Dividends received',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: c.textPrimary)),
+          const SizedBox(width: 6),
+          Text('· estimated',
+              style: TextStyle(fontSize: 11, color: c.textMuted)),
+        ]);
+
     return async.maybeWhen(
       data: (list) {
-        if (list.isEmpty) return const SizedBox.shrink();
+        if (list.isEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              header(),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  border: Border.all(color: c.border),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(children: [
+                  Icon(Icons.savings_outlined, size: 20, color: c.textMuted),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'No dividends received yet. As the stocks you hold pay '
+                      'out, your passive income will build up here.',
+                      style: TextStyle(
+                          fontSize: 12, height: 1.45, color: c.textSecond),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 24),
+            ],
+          );
+        }
 
         final now = DateTime.now();
         final months =
@@ -1220,16 +1261,7 @@ class _ReceivedDividendsSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Text('Dividends received',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: c.textPrimary)),
-              const SizedBox(width: 6),
-              Text('· estimated',
-                  style: TextStyle(fontSize: 11, color: c.textMuted)),
-            ]),
+            header(),
             const SizedBox(height: 12),
             Row(children: [
               _KpiCard(
