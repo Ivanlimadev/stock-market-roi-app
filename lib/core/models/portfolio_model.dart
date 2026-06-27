@@ -86,7 +86,12 @@ class PortfolioHolding {
 
   double get effectivePrice => currentPrice ?? avgPrice;
   double get currentValue => netShares * effectivePrice;
-  double get costBasis => totalCost;
+
+  /// Cost basis of the *current* position: shares held × average buy price.
+  /// `totalCost` from the view is the gross cost of all buys, so using it
+  /// directly overstates the basis (and understates gains) after a partial
+  /// sell. With no sells the two are identical.
+  double get costBasis => netShares * avgPrice;
   double get gainLoss => currentValue - costBasis;
   double get gainLossPct => costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
   bool get hasLivePrice => currentPrice != null;
